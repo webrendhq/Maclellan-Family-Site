@@ -6,7 +6,7 @@ import { getUserCount, updateTotalFileCount } from 'https://maclellan-family-web
 
 
 
-
+let cursor = null;
 
 // Function to search Dropbox files and append results
 async function searchDropboxFiles(startIndex = 1) {
@@ -125,7 +125,10 @@ async function searchDropboxFiles(startIndex = 1) {
                       if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
                       mediaElement = document.createElement('img');
                       // mediaElement.dataset.src = tempLinkData.link;
+                      mediaElement.style.transition = 'all 0.3s ease-in-out';
                       mediaElement.src = previewUrl; // Use preview URL for initial loading
+                      mediaElement.style.animation = 'fade-in 500ms forwards';
+                      mediaElement.style.animationDelay = 'calc(0.1s * var(--))';
                       // mediaElement.setAttribute('data-src', tempLinkData.link); // Set temp link for lazy loading
                       // mediaElement.setAttribute('loading', 'lazy');
                       // mediaElement.style.maxWidth = '100%';
@@ -133,10 +136,15 @@ async function searchDropboxFiles(startIndex = 1) {
                       } else if (['mp4', 'mov', 'avi', 'mkv'].includes(fileExtension)) {
                       mediaElement = document.createElement('video');
                       // mediaElement.dataset.src = tempLinkData.link;
+                      mediaElement.style.transition = 'all 0.3s ease-in-out';
                       mediaElement.src = previewUrl; // Use preview URL for initial loading
                       // mediaElement.setAttribute('data-src', tempLinkData.link); // Set temp link for lazy loading
                       // mediaElement.setAttribute('loading', 'lazy');
+               
                       mediaElement.controls = true;
+                      mediaElement.style.animation = 'fade-in 500ms forwards';
+                      mediaElement.style.animationDelay = 'calc(0.1s * var(--))';
+                      
                       // mediaElement.style.maxWidth = '100%';
                       
                       }
@@ -180,3 +188,17 @@ async function searchDropboxFiles(startIndex = 1) {
       const results = await searchDropboxFiles(startIndex);
       await appendResults(results);
   }
+
+
+// Initialize by loading the first set of files
+loadMoreFiles();
+
+// Add "Load More" button in a wrapper dynamically
+const loadMoreWrapper = document.getElementById('load-more-wrapper');
+const loadMoreButton = document.createElement('button');
+loadMoreButton.id = 'load-more-button';
+loadMoreButton.innerText = 'Load More';
+loadMoreButton.style.display = 'none';
+loadMoreButton.addEventListener('click', loadMoreFiles);
+
+loadMoreWrapper.appendChild(loadMoreButton);

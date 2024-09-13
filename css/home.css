@@ -60,6 +60,7 @@ body {
 .search-contents{
     width: 80%;
     height:80%;
+    overflow: auto;
 }
 
 .search-button{
