@@ -54,21 +54,21 @@ async function handleSignUp(e) {
         console.log('User successfully created: ' + user.email);
 
         const folderPath = `/${name}`;
-        console.log(`Creating folder in Dropbox at path: ${folderPath}`);
-        
+        console.log(`Attempting to create folder in Dropbox at path: ${folderPath}`);
 
         try {
-            const createFolderResponse = await dbx.filesCreateFolderV2({ path: folderPath });
+            const createFolderResponse = await dbx.filesCreateFolderV2({ path: folderPath, autorename: true });
             console.log('Folder created in Dropbox for user:', createFolderResponse);
         } catch (dropboxError) {
-            if (dropboxError.response) {
-                const errorText = await dropboxError.response.text();
-                console.error('Dropbox folder creation failed:', errorText);
+            if (dropboxError.status === 409) {
+                console.log('Folder already exists, proceeding with sign-up');
+                // You might want to generate a unique name here instead
             } else {
                 console.error('Dropbox folder creation failed:', dropboxError);
+                throw dropboxError;
             }
-            throw dropboxError;
         }
+        
 
         await setDoc(doc(db, "users", user.uid), {
             uid: user.uid,
