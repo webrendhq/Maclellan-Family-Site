@@ -8,14 +8,13 @@ let cursor = null;
 
 // Your Firebase config
 const firebaseConfig = {
-    apiKey: "AIzaSyB5DMIx5yWtZJsZFrNFjkFc68rtWDzdW_k",
-    authDomain: "tina-coombs-site.firebaseapp.com",
-    databaseURL: "https://tina-coombs-site-default-rtdb.firebaseio.com",
-    projectId: "tina-coombs-site",
-    storageBucket: "tina-coombs-site.appspot.com",
-    messagingSenderId: "414945778846",
-    appId: "1:414945778846:web:38d525b62f09bf215f6f8f"
-};
+    apiKey: "AIzaSyCqGV5J3if7mJoH464xGx6bZ5wgU_wMn3I",
+    authDomain: "maclellen.firebaseapp.com",
+    projectId: "maclellen",
+    storageBucket: "maclellen.appspot.com",
+    messagingSenderId: "254246388059",
+    appId: "1:254246388059:web:ca15c2405a33477665da7e"
+  };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
