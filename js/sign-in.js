@@ -56,17 +56,48 @@ async function handleSignUp(e) {
         const folderPath = `/${name}`;
         console.log(`Attempting to create folder in Dropbox at path: ${folderPath}`);
 
-        try {
-            const createFolderResponse = await dbx.filesCreateFolderV2({ path: folderPath, autorename: true });
-            console.log('Folder created in Dropbox for user:', createFolderResponse);
-        } catch (dropboxError) {
-            if (dropboxError.status === 409) {
-                console.log('Folder already exists, proceeding with sign-up');
-                // You might want to generate a unique name here instead
-            } else {
-                console.error('Dropbox folder creation failed:', dropboxError);
-                throw dropboxError;
+        const name = document.getElementById('signup-name').value;
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+
+    console.log("Attempting sign up - Name:", name, "Email:", email);
+
+    try {
+        // ... (keep existing user count check and Firebase user creation)
+
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        console.log('User successfully created:', user.email);
+
+        let folderPath = `/${name}`;
+        let folderCreated = false;
+        let attemptCount = 0;
+
+        while (!folderCreated && attemptCount < 2) {
+            try {
+                console.log(`Attempting to create folder in Dropbox at path: ${folderPath}`);
+                const createFolderResponse = await dbx.filesCreateFolderV2({ path: folderPath });
+                console.log('Folder created in Dropbox for user:', createFolderResponse);
+                folderCreated = true;
+            } catch (dropboxError) {
+                if (dropboxError.status === 409) {
+                    console.log('Folder already exists, trying with email');
+                    if (attemptCount === 0) {
+                        folderPath = `/${name} (${email})`;
+                    } else {
+                        throw new Error('Failed to create a unique folder name');
+                    }
+                } else {
+                    console.error('Dropbox folder creation failed:', dropboxError);
+                    throw dropboxError;
+                }
             }
+            attemptCount++;
+        }
+
+        if (!folderCreated) {
+            throw new Error('Failed to create Dropbox folder after multiple attempts');
         }
         
 
