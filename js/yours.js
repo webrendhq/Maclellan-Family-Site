@@ -1,21 +1,29 @@
 // Import the functions you need from the SDKs you need
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
-import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-  
-
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // User is signed in, continue to show the restricted page.
-    } else {
-      // No user is signed in, redirect to login page.
-      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/';
-    }
-});
+import { auth, onAuthStateChanged, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js';
 
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
 let hasMore = false;
+let userFolderSlug = "";
+
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        // User is signed in, get the folder slug from Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+            userFolderSlug = userDoc.data().name;
+            console.log("User's folder slug:", userFolderSlug);
+        } else {
+            console.error("No user document found!");
+        }
+    } else {
+        // No user is signed in, redirect to login page
+        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/';
+    }
+});
 
 // Function to search Dropbox files and append results
 async function searchDropboxFiles(query, startIndex = 0) {
@@ -23,6 +31,15 @@ async function searchDropboxFiles(query, startIndex = 0) {
     let searchResults = [];
     
     try {
+        const searchPath = `/${userFolderSlug}`; // Use the user's folder slug
+        const searchBody = {
+            query: query,
+            options: {
+                path: searchPath,
+                max_results: 100
+            }
+        };
+
         if (!cursor) {
             // Initial search request
             const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
@@ -31,16 +48,13 @@ async function searchDropboxFiles(query, startIndex = 0) {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    query: query,
-                    options: { max_results: 100 } // Request more results to check if there are more
-                })
+                body: JSON.stringify(searchBody)
             });
 
             if (response.ok) {
                 const data = await response.json();
                 searchResults = data.matches.map(match => match.metadata.metadata);
-                cursor = data.has_more ? data.cursor : null; // Save the cursor only if there are more results
+                cursor = data.has_more ? data.cursor : null;
                 hasMore = data.has_more;
             } else {
                 console.error('Error searching Dropbox files:', response.statusText);
@@ -61,7 +75,7 @@ async function searchDropboxFiles(query, startIndex = 0) {
             if (response.ok) {
                 const data = await response.json();
                 searchResults = data.matches.map(match => match.metadata.metadata);
-                cursor = data.has_more ? data.cursor : null; // Update cursor only if there are more results
+                cursor = data.has_more ? data.cursor : null;
                 hasMore = data.has_more;
             } else {
                 console.error('Error continuing search for Dropbox files:', response.statusText);
@@ -76,7 +90,7 @@ async function searchDropboxFiles(query, startIndex = 0) {
 
 // Function to append search results to the DOM
 async function appendResults(results) {
-    const container = document.getElementById('search-results');
+    const container = document.getElementById('personal-results');
     if (startIndex === 0) {
         container.innerHTML = ''; // Clear previous results only on new search
     }
@@ -194,28 +208,29 @@ async function loadMoreFiles() {
 
 // Function to handle the search
 async function handleSearch() {
-    const searchInput = document.getElementById('search-input');
+    const searchInput = document.getElementById('personal-search-input');
     currentQuery = searchInput.value.trim();
     
-    if (currentQuery) {
+    if (currentQuery && userFolderSlug) {
         startIndex = 0;
         cursor = null; // Reset cursor for new search
         const results = await searchDropboxFiles(currentQuery);
         await appendResults(results);
+    } else if (!userFolderSlug) {
+        console.error("User's folder slug is not available. Please ensure you're logged in.");
+        // You might want to display this error to the user in the UI
     }
 }
 
-// Add event listener to search button
-document.getElementById('search-button').addEventListener('click', handleSearch);
-
-// Add event listener for pressing Enter in the search input
-document.getElementById('search-input').addEventListener('keypress', function(event) {
+// Add event listeners (same as before)
+document.getElementById('personal-search-button').addEventListener('click', handleSearch);
+document.getElementById('personal-search-input').addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
         handleSearch();
     }
 });
 
-// Initialize by setting up the "Load More" button
+// Initialize by setting up the "Load More" button (same as before)
 const loadMoreWrapper = document.getElementById('load-more-wrapper');
 const loadMoreButton = document.createElement('button');
 loadMoreButton.id = 'load-more-button';
@@ -224,4 +239,3 @@ loadMoreButton.style.display = 'none';
 loadMoreButton.addEventListener('click', loadMoreFiles);
 
 loadMoreWrapper.appendChild(loadMoreButton);
-
