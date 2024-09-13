@@ -89,6 +89,7 @@ body {
     flex-grow: 1;
     width: 100%;
     height: 100%;
+    cursor: pointer;
 }
 
 .random-pictures-temp-div{
