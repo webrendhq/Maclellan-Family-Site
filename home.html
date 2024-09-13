@@ -6,19 +6,193 @@
     <title>Maclellen Family Website</title>
     <link rel="stylesheet" href="css/home.css">
     <script src="js/firebase_init.js"></script>
+
+    <!-- NAV BAR -->
+    <div class="nav-bar" id="nav-bar">
+        <button class="nav-button">Search</button>
+        <button class="nav-button">Family</button>
+        <button class="nav-button">Yours</button>
+        <button class="nav-button">Admin</button>
+    </div>
 </head>
 
 
 <body>
-    <div class="nav-bar" id="nav-bar">
-        <button>Search</button>
-        <button>Family</button>
-        <button>Yours</button>
-        <button>Admin</button>
-    </div>
-    <section class="pictures-section">
+
+    <!-- MEDIA CONTAINER AND USER CONTAINER STYLES -->
+    <style>
+        #search-results > div, #user-pictures-container > div {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        img, video {
+            border-radius: 10px;
+            border-color: black;
+            border: 3px;
+            max-width: 100%;
+            max-height: 350px;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+    
+    <style>
+    /* Container for search results */
+    #search-results {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Dynamic columns based on available space */
+        gap: 15px; /* Space between grid items */
+        margin: 20px;
+    }
+
+    /* Wrapper for each media item */
+    #search-results > div {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px; /* Rounded corners */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow effect */
+        background-color: #fff; /* Background for each item */
+        transition: transform 0.3s ease, box-shadow 0.3s ease; /* Hover animation */
+        animation: fade-in 500ms forwards;
+        animation-delay: calc(0.1s * var(--));
+    }
+
+    /* Media element styles (images/videos) */
+    #search-results img, 
+    #search-results video {
+        width: 100%;
+        height: auto;
+        display: block;
+        object-fit: cover; /* Ensure media fills the space */
+        border-radius: 8px;
+        cursor: pointer;
+        animation: fade-in 500ms forwards;
+        animation-delay: calc(0.1s * var(--));
+    }
+
+    /* Hover effect for media items */
+    #search-results > div:hover {
+        transform: translateY(-5px); /* Lift effect on hover */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Enhanced shadow on hover */
+    }
+
+    /* Load More button styles */
+    #load-more-wrapper {
+        display: flex;
+        justify-content: center;
+        margin: 20px 0;
+    }
+
+    #load-more-wrapper button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #007bff; /* Button color */
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease; /* Smooth transition for hover */
+        animation: fade-in 500ms forwards;
+        animation-delay: calc(0.1s * var(--));
+    }
+
+    /* Hover effect for Load More button */
+    #load-more-wrapper button:hover {
+        background-color: #0056b3; /* Darker blue on hover */
+    }
+
+    /* Responsive styling */
+    @media (max-width: 600px) {
+        #search-results {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Adjust for smaller screens */
+        }
+    }
+
+    </style>
+
+
+
+    <!-- SEARCH IMAGES AND VIDEOS STYLED LIKE PINTEREST-->
+    <style>
+        #search-results img, #search-results video {
+          width: 100%;
+          height: 100%;
+          max-width: 100%;
+          border-radius: 16px;
+          transition: opacity 0.3s ease, transform 0.3s ease;
+          cursor: pointer;
+        }
+      
+        #search-results img:hover, #search-results video:hover {
+          opacity: 0.85;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          const container = document.getElementById('search-results');
+          if (!container) {
+            console.error('Container not found');
+            return;
+          }
+      
+          container.addEventListener('click', function(event) {
+            const target = event.target;
+            if (target.tagName === 'IMG' || target.tagName === 'VIDEO') {
+              event.stopPropagation(); // Prevent the click event from bubbling up
+              openInNewTab(target);
+            }
+          });
+      
+          function openInNewTab(mediaElement) {
+            const url = mediaElement.src;
+            const mediaType = mediaElement.tagName.toLowerCase();
+            const newWindow = window.open('', '_blank');
+      
+            const styles = `
+      <style>
+      body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: black; }
+      img, video { max-width: 100%; max-height: 100%; object-fit: contain; }
+        </style>
+      `;
+      
+            if (mediaType === 'img') {
+              newWindow.document.write(`
+      ${styles}
+      <img src="${url}">
+      `);
+            } else if (mediaType === 'video') {
+              newWindow.document.write(`
+      ${styles}
+      <video controls>
+      <source src="${url}" type="video/mp4">
+      Your browser does not support the video tag.
+        </video>
+      `);
+            }
+            newWindow.document.close();
+          }
+        });
+    </script>
+
+
+
+
+
+    <!-- ACTUAL HTML -->
+    <section class="home-section">
+        <div class="random-pictures-temp-div" id="random-pictures">
+
+        </div>
+        <div class="search-contents" id="search-contents">
+            <div class="search-results" id="search-results">
+
+            </div>
+        </div>
         <div class="search-wrapper">
             <input class="search-bar" placeholder="Search for your favorite moment...">
+            <button class="search-button" id="search-button">Search</button>
         </div>
     </section>
     
