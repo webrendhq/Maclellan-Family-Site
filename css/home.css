@@ -9,6 +9,7 @@ body {
     border-radius: 50px;
     padding-left: 15px;
     border-color: white;
+    flex-grow: 1;
 }
 
 .search-wrapper{
@@ -94,6 +95,7 @@ body {
     width: 100%;
     height: 100%;
     cursor: pointer;
+    flex-grow: 1;
 }
 
 .random-pictures-temp-div{
