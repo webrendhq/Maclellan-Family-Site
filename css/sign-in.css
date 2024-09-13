@@ -1,7 +1,7 @@
 body {
     background-color: #161920;
 }
-.homescreen-section {
+.sign-in-section {
     z-index: 0;
     flex-flow: column;
     justify-content: center;
@@ -12,6 +12,8 @@ body {
     position: fixed;
     overflow: none;
 }
+
+
 
 .firebase-auth-wrapper {
     display: none;
