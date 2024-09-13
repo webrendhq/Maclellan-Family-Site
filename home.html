@@ -9,6 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dropbox.js/10.15.0/Dropbox-sdk.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script type="module" src="js/home.js"></script>
+    <script type="module" src="js/sign-out.js"></script>
 
     <!-- NAV BAR -->
     <div class="nav-bar" id="nav-bar">
@@ -112,7 +113,6 @@
             grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Adjust for smaller screens */
         }
     }
-
     </style>
 
 
@@ -183,8 +183,13 @@
 
 
 
+
+
+
+
     <!-- ACTUAL HTML -->
     <section class="home-section">
+        <button class="sign-out-button" id="sign-out">Sign Out</button>
         <div class="random-pictures-temp-div" id="random-pictures"></div>
 
         <div class="overfllow-wrapper">
