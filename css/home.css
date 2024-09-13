@@ -1,28 +1,30 @@
 body {
-    background-color: rgb(4, 1, 27);
+    background-color: rgb(0, 0, 0);
 }
 
 .search-bar {
     width: 35rem;
     height: 35px;
-    background-color: #F3EEE1;
+    background-color: #f3eee1;
     border-radius: 50px;
     padding-left: 15px;
-    border-color: white;
+    border-color: rgba(127, 127, 127, 0.383);
     flex-grow: 1;
 }
 
 .search-wrapper{
     border-width: 10px;
-    border-color: #F3EEE1;
-    background-color: #F3EEE1;
+    border-color: #666666;
+    background-color: #fffcf372;
     padding: 4px;
     padding-bottom: 15px;
     border-radius: 25px 25px 0px 0px;
-    color: #F3EEE1;
-    text-emphasis-color: white;
+    color: #00000075;
     position: relative;
     z-index: 1;
+    box-shadow: 0px 0px 50px 5px;
+    backdrop-filter: blur(5px);
+    
 }
 
 .nav-bar {
@@ -36,14 +38,18 @@ body {
     margin-right: auto;
     display: flex;
     flex-direction: row;
+    padding-top: 5px;
     position: fixed;
     inset: 0% 0% auto;
-    top: 1%;
+    top: 0%;
     left: 0%;
     right: 0%;
     bottom: 0%;
-    border-radius: 50px;
-    background-color: blanchedalmond;
+    border-radius: 0px 0px 20px 20px;
+    background-color: rgba(255, 235, 205, 0.388);
+    backdrop-filter: blur(5px);
+    color: #00000075;
+    box-shadow: 0px 0px 50px 5px;
     overflow: none;
 }
 
@@ -56,6 +62,10 @@ body {
     height: 100%;
     display: flex;
     position: fixed;
+    top: 0%;
+    left: 0%;
+    right: 0%;
+    bottom: 0%;
     overflow: none;
     background-image: url(../images/maclellan-bg.jpg);
 }
@@ -74,8 +84,10 @@ body {
     border-color: transparent;
     cursor: pointer;
     height: 100%;
-    background-color: brown;
+    background-color: rgba(0, 0, 0, 0.708);
     color: #F3EEE1;
+    margin-left: -50px;
+    backdrop-filter: blur(51px);
 }
 
 .overfllow-wrapper{
@@ -89,6 +101,8 @@ body {
     border-radius: 20px;
     position: absolute;
     z-index: 1;
+    display: none;
+    
 }
 
 .nav-button{
@@ -98,6 +112,7 @@ body {
     cursor: pointer;
     flex-grow: 1;
     background-color: transparent;
+    border-color: transparent;
 }
 
 .random-pictures-temp-div{
@@ -114,6 +129,32 @@ body {
     z-index: 1;
 }
 
+#load-more-button{
+    background-color: transparent;
+    padding: 5px;
+}
+
 .sign-out-button{
     background-color: transparent;
+    border-color: transparent;
+}
+
+.section-folders{
+    width: 98%;
+    height: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 16px;
+    border-radius: 16px 16px 0px 0px;
+    text-emphasis-color: black;
+    
+    box-shadow: 0px 0px 20px 5px rgba(0, 0, 0, 0.145);
+    
+    overflow: hidden;
+    position: absolute;
+    top: 0%;
+    left: 0%;
+    bottom: 0%;
+    right: 0%;
+    z-index: 0;
 }
