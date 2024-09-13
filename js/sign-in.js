@@ -3,7 +3,7 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 import { doc, setDoc, getDoc, getDocs , collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 import { dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
-import { auth, db, app } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { auth, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
 
 let cursor = null;
