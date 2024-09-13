@@ -108,6 +108,4 @@ async function handleSignIn(e) {
 document.getElementById('signup-form').addEventListener('submit', handleSignUp);
 document.getElementById('signin-form').addEventListener('submit', handleSignIn);
 
-// if (signOutButton) signOutButton.addEventListener('click', handleSignOut);
-
 
