@@ -1,8 +1,12 @@
 // Import the functions you need from the SDKs you need
+// import { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs , collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 import { refreshDropboxAccessToken, createDropboxInstance, getDropboxInstance, accessToken, dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+
+
+let cursor = null;
 
 // Your Firebase config
 const firebaseConfig = {
@@ -12,7 +16,7 @@ const firebaseConfig = {
     storageBucket: "maclellen.appspot.com",
     messagingSenderId: "254246388059",
     appId: "1:254246388059:web:ca15c2405a33477665da7e"
-};
+  };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -33,7 +37,8 @@ async function handleSignUp(e) {
     const email = document.getElementById('signup-email').value;
     const password = document.getElementById('signup-password').value;
 
-    console.log("Attempting sign up - Name:", name, "Email:", email);
+    console.log("Name is " + name);
+    console.log("Email is " + email);
 
     try {
         const userCount = await getUserCount();
@@ -46,43 +51,31 @@ async function handleSignUp(e) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         
-        console.log('User successfully created:', user.email);
+        console.log('User successfully created: ' + user.email);
 
-        let folderPath = `/${name}`;
-        let folderCreated = false;
-        let attemptCount = 0;
+        const folderPath = `/${name}`;
+        console.log(`Attempting to create folder in Dropbox at path: ${folderPath}`);
 
-        while (!folderCreated && attemptCount < 2) {
-            try {
-                console.log(`Attempting to create folder in Dropbox at path: ${folderPath}`);
-                const createFolderResponse = await dbx.filesCreateFolderV2({ path: folderPath });
-                console.log('Folder created in Dropbox for user:', createFolderResponse);
-                folderCreated = true;
-            } catch (dropboxError) {
-                if (dropboxError.status === 409) {
-                    console.log('Folder already exists, trying with email');
-                    if (attemptCount === 0) {
-                        folderPath = `/${name} (${email})`;
-                    } else {
-                        throw new Error('Failed to create a unique folder name');
-                    }
-                } else {
-                    console.error('Dropbox folder creation failed:', dropboxError);
-                    throw dropboxError;
-                }
+        try {
+            const createFolderResponse = await dbx.filesCreateFolderV2({ path: folderPath, autorename: true });
+            console.log('Folder created in Dropbox for user:', createFolderResponse);
+        } catch (dropboxError) {
+            if (dropboxError.status === 409) {
+                console.log('Folder already exists, proceeding with sign-up');
+                // You might want to generate a unique name here instead
+            } else {
+                console.error('Dropbox folder creation failed:', dropboxError);
+                throw dropboxError;
             }
-            attemptCount++;
         }
-
-        if (!folderCreated) {
-            throw new Error('Failed to create Dropbox folder after multiple attempts');
-        }
+        
 
         await setDoc(doc(db, "users", user.uid), {
             uid: user.uid,
             name: name,
             email: user.email,
             role: 'user',
+            
             folderPath: folderPath
         });
 
@@ -127,10 +120,9 @@ async function handleSignIn(e) {
 }
 
 // Attach event listeners to the form elements
-document.addEventListener('DOMContentLoaded', () => {
-    const signupForm = document.getElementById('signup-form');
-    const signinForm = document.getElementById('signin-form');
+document.getElementById('signup-form').addEventListener('submit', handleSignUp);
+document.getElementById('signin-form').addEventListener('submit', handleSignIn);
 
-    if (signupForm) signupForm.addEventListener('submit', handleSignUp);
-    if (signinForm) signinForm.addEventListener('submit', handleSignIn);
-});
+// if (signOutButton) signOutButton.addEventListener('click', handleSignOut);
+
+
