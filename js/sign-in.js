@@ -79,7 +79,7 @@ async function handleSignUp(e) {
         });
 
         console.log('User document created with content and folder path.');
-        window.location.href = 'https://www.macllelan.com/home.html';
+        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/home.html';
 
     } catch (error) {
         const errorMessage = error.message;
@@ -106,7 +106,7 @@ async function handleSignIn(e) {
         if (userDoc.exists()) {
             const userData = userDoc.data();
             console.log(`User document data: ${JSON.stringify(userData)}`);
-            window.location.href = 'https://www.macllelan.com/home.html';
+            window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/home.html';
         } else {
             console.log("No such document!");
         }
