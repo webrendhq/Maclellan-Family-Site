@@ -13,7 +13,7 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         // User is signed in, fetch their folder path
         try {
-            const userDoc = await getDoc(doc(db, 'users', user.email));
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (userDoc.exists()) {
                 userFolderPath = userDoc.data().folderPath;
                 console.log('User folder path:', userFolderPath);
