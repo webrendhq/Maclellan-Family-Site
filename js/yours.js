@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
-import { auth, onAuthStateChanged, db, } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-import { doc, getDoc, collection } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
+import { auth, onAuthStateChanged, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js';
 
 let cursor = null;
 let startIndex = 0;
@@ -11,18 +11,13 @@ let userFolderSlug = "";
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        try {
-            // User is signed in, get the folder slug from Firestore
-            const userDocRef = doc(db, "users", user.uid);
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-                userFolderSlug = userDoc.data().name;
-                console.log("User's folder slug:", userFolderSlug);
-            } else {
-                console.error("No user document found!");
-            }
-        } catch (error) {
-            console.error("Error fetching user document:", error);
+        // User is signed in, get the folder path from Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+            userFolderPath = userDoc.data().folderPath;
+            console.log("User's folder path:", userFolderPath);
+        } else {
+            console.error("No user document found!");
         }
     } else {
         // No user is signed in, redirect to login page
@@ -32,16 +27,11 @@ onAuthStateChanged(auth, async (user) => {
 
 // Function to search Dropbox files and append results
 async function searchDropboxFiles(query, startIndex = 0) {
-    if (!userFolderSlug) {
-        console.error("User's folder slug is not available. Please ensure you're logged in.");
-        return [];
-    }
-
     await refreshDropboxAccessToken(); // Ensure the access token is fresh
     let searchResults = [];
     
     try {
-        const searchPath = `/${userFolderSlug}`; // Use the user's folder slug
+        const searchPath = userFolderPath; // Use the user's folder path
         const searchBody = {
             query: query,
             options: {
@@ -50,30 +40,46 @@ async function searchDropboxFiles(query, startIndex = 0) {
             }
         };
 
-        const endpoint = cursor 
-            ? 'https://api.dropboxapi.com/2/files/search/continue_v2'
-            : 'https://api.dropboxapi.com/2/files/search_v2';
+        if (!cursor) {
+            // Initial search request
+            const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(searchBody)
+            });
 
-        const body = cursor 
-            ? JSON.stringify({ cursor: cursor })
-            : JSON.stringify(searchBody);
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: body
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            searchResults = data.matches.map(match => match.metadata.metadata);
-            cursor = data.has_more ? data.cursor : null;
-            hasMore = data.has_more;
+            if (response.ok) {
+                const data = await response.json();
+                searchResults = data.matches.map(match => match.metadata.metadata);
+                cursor = data.has_more ? data.cursor : null;
+                hasMore = data.has_more;
+            } else {
+                console.error('Error searching Dropbox files:', response.statusText);
+            }
         } else {
-            console.error('Error searching Dropbox files:', response.statusText);
+            // Continue from where we left off
+            const response = await fetch('https://api.dropboxapi.com/2/files/search/continue_v2', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    cursor: cursor
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                searchResults = data.matches.map(match => match.metadata.metadata);
+                cursor = data.has_more ? data.cursor : null;
+                hasMore = data.has_more;
+            } else {
+                console.error('Error continuing search for Dropbox files:', response.statusText);
+            }
         }
     } catch (error) {
         console.error('Error during search or continue search:', error);
@@ -200,20 +206,19 @@ async function loadMoreFiles() {
     await appendResults(results);
 }
 
+// Function to handle the search
 async function handleSearch() {
     const searchInput = document.getElementById('personal-search-input');
     currentQuery = searchInput.value.trim();
     
-    if (currentQuery && userFolderSlug) {
+    if (currentQuery && userFolderPath) {
         startIndex = 0;
         cursor = null; // Reset cursor for new search
         const results = await searchDropboxFiles(currentQuery);
         await appendResults(results);
-    } else if (!userFolderSlug) {
-        console.error("User's folder slug is not available. Please ensure you're logged in.");
-        // Display this error to the user in the UI
-        const container = document.getElementById('personal-results');
-        container.innerHTML = '<p>Error: User\'s folder slug is not available. Please ensure you\'re logged in.</p>';
+    } else if (!userFolderPath) {
+        console.error("User's folder path is not available. Please ensure you're logged in.");
+        // You might want to display this error to the user in the UI
     }
 }
 
