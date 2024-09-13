@@ -15,7 +15,7 @@ const firebaseConfig = {
     storageBucket: "tina-coombs-site.appspot.com",
     messagingSenderId: "414945778846",
     appId: "1:414945778846:web:38d525b62f09bf215f6f8f"
-  };
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

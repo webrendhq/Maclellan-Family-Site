@@ -112,7 +112,7 @@ input{
     font-family: 'GazpachoBlackItalic';
     font-size: 12px;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 4px;
     justify-content: center;
     align-items: center;
