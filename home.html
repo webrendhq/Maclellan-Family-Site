@@ -30,7 +30,7 @@
         }
 
         img, video {
-            border-radius: 10px;
+            border-radius: 16px;
             border-color: black;
             border: 3px;
             max-width: 100%;
@@ -54,9 +54,9 @@
     #search-results > div {
         position: relative;
         overflow: hidden;
-        border-radius: 8px; /* Rounded corners */
+        border-radius: 20px; /* Rounded corners */
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow effect */
-        background-color: #fff; /* Background for each item */
+        
         transition: transform 0.3s ease, box-shadow 0.3s ease; /* Hover animation */
         animation: fade-in 500ms forwards;
         animation-delay: calc(0.1s * var(--));
@@ -186,7 +186,7 @@
     <!-- ACTUAL HTML -->
     <section class="home-section">
         <div class="random-pictures-temp-div" id="random-pictures"></div>
-        
+
         <div class="overfllow-wrapper">
             <div class="search-contents" id="search-contents">
                 <div class="search-results" id="search-results"></div>
@@ -196,7 +196,7 @@
         <div class="load-more-wrapper" id="load-more-wrapper"></div>
         
         <div class="search-wrapper">
-            <input class="search-bar" placeholder="Search for your favorite moment...">
+            <input class="search-bar" id="search-input" placeholder="Search for your favorite moment...">
             <button class="search-button" id="search-button">Search</button>
         </div>
         
