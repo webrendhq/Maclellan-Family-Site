@@ -1,6 +1,17 @@
 // Import the functions you need from the SDKs you need
 import { refreshDropboxAccessToken, createDropboxInstance, getDropboxInstance, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // User is signed in, continue to show the restricted page.
+    } else {
+      // No user is signed in, redirect to login page.
+      window.location.href = '/index.html';
+    }
+});
+  
+
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
