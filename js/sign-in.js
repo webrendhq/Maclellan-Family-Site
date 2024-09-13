@@ -1,27 +1,12 @@
 // Import the functions you need from the SDKs you need
 // import { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs , collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-import { refreshDropboxAccessToken, createDropboxInstance, getDropboxInstance, accessToken, dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+import { doc, setDoc, getDoc, getDocs , collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+import { auth, db, app } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
 
 let cursor = null;
-
-// Your Firebase config
-const firebaseConfig = {
-    apiKey: "AIzaSyCqGV5J3if7mJoH464xGx6bZ5wgU_wMn3I",
-    authDomain: "maclellen.firebaseapp.com",
-    projectId: "maclellen",
-    storageBucket: "maclellen.appspot.com",
-    messagingSenderId: "254246388059",
-    appId: "1:254246388059:web:ca15c2405a33477665da7e"
-  };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 async function getUserCount() {
     const querySnapshot = await getDocs(collection(db, "users"));

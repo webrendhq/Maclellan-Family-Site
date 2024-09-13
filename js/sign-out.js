@@ -1,16 +1,6 @@
 import { signOut } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 import { auth } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
-// Your Firebase config
-const firebaseConfig = {
-    apiKey: "AIzaSyCqGV5J3if7mJoH464xGx6bZ5wgU_wMn3I",
-    authDomain: "maclellen.firebaseapp.com",
-    projectId: "maclellen",
-    storageBucket: "maclellen.appspot.com",
-    messagingSenderId: "254246388059",
-    appId: "1:254246388059:web:ca15c2405a33477665da7e"
-};
-
 // Handle sign-out
 function handleSignOut() {
     signOut(auth).then(() => {
