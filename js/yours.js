@@ -1,26 +1,30 @@
 // Import the functions you need from the SDKs you need
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
 
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
 let hasMore = false;
-let userFolderSlug = "";
+let userFolderPath = null;
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        // User is signed in, get the folder path from Firestore
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-            userFolderPath = userDoc.data().folderPath;
-            console.log("User's folder path:", userFolderPath);
-        } else {
-            console.error("No user document found!");
+        // User is signed in, fetch their folder path
+        try {
+            const userDoc = await getDoc(doc(db, 'users', user.email));
+            if (userDoc.exists()) {
+                userFolderPath = userDoc.data().folderPath;
+                console.log('User folder path:', userFolderPath);
+            } else {
+                console.error('No folder path found for user:', user.email);
+            }
+        } catch (error) {
+            console.error('Error fetching user folder path:', error);
         }
     } else {
-        // No user is signed in, redirect to login page
+        // No user is signed in, redirect to login page.
         window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/';
     }
 });
@@ -30,13 +34,21 @@ async function searchDropboxFiles(query, startIndex = 0) {
     await refreshDropboxAccessToken(); // Ensure the access token is fresh
     let searchResults = [];
     
+    if (!userFolderPath) {
+        console.error('User folder path not set');
+        return [];
+    }
+
     try {
-        const searchPath = userFolderPath; // Use the user's folder path
+        const searchPath = userFolderPath.endsWith('/') ? userFolderPath : `${userFolderPath}/`;
         const searchBody = {
             query: query,
             options: {
                 path: searchPath,
-                max_results: 100
+                file_status: 'active',
+                filename_only: false,
+                max_results: 100,
+                file_extensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'mkv']
             }
         };
 
@@ -67,9 +79,7 @@ async function searchDropboxFiles(query, startIndex = 0) {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ 
-                    cursor: cursor
-                })
+                body: JSON.stringify({ cursor: cursor })
             });
 
             if (response.ok) {
@@ -217,20 +227,21 @@ async function handleSearch() {
         const results = await searchDropboxFiles(currentQuery);
         await appendResults(results);
     } else if (!userFolderPath) {
-        console.error("User's folder path is not available. Please ensure you're logged in.");
-        // You might want to display this error to the user in the UI
+        console.error('User folder path not set. Please ensure you are logged in.');
     }
 }
 
-// Add event listeners (same as before)
+// Add event listener to search button
 document.getElementById('personal-search-button').addEventListener('click', handleSearch);
+
+// Add event listener for pressing Enter in the search input
 document.getElementById('personal-search-input').addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
         handleSearch();
     }
 });
 
-// Initialize by setting up the "Load More" button (same as before)
+// Initialize by setting up the "Load More" button
 const loadMoreWrapper = document.getElementById('load-more-wrapper');
 const loadMoreButton = document.createElement('button');
 loadMoreButton.id = 'load-more-button';

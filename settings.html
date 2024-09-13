@@ -3,28 +3,258 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin</title>
-    <link rel="stylesheet" href="css/admin.css">
-    <script type="module" src="js/admin.js"></script>
-    <script type="module" src="js/sign-out.js"></script>
+    <title>User Settings - Profile</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            height: 100%;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            height: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            width: 240px;
+            background-color: white;
+            padding: 20px;
+            border-right: 1px solid #e0e0e0;
+        }
+        .content {
+            flex-grow: 1;
+            padding: 30px;
+            background-color: white;
+        }
+        h1, h2 {
+            margin: 0;
+            font-weight: normal;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin-bottom: 30px;
+        }
+        li {
+            padding: 8px 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        li:before {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+        .active {
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        .profile-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #ff8c00;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            color: white;
+            margin-right: 20px;
+        }
+        .profile-info {
+            flex-grow: 1;
+        }
+        .profile-info h2 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .profile-info p {
+            margin: 0;
+            color: #666;
+        }
+        .visit-profile {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            text-decoration: none;
+            color: black;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 30px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .birthday-inputs {
+            display: flex;
+            gap: 20px;
+        }
+        .birthday-inputs .form-group {
+            flex-grow: 1;
+        }
+        .description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .twitter-link {
+            color: #1da1f2;
+        }
+        .log-out {
+            color: #ff4d4d;
+        }
+        .close-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+        }
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-left {
+            display: flex;
+            align-items: center;
+        }
+        .footer-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #ff9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            color: white;
+            margin-right: 10px;
+        }
+    </style>
 </head>
 <body>
-    <section class="admin-section"></section>
-        <button class="sign-out-button" id="sign-out">Sign Out</button>
-
-        <div class="overfllow-wrapper">
-            <div class="search-contents" id="search-contents">
-                <div class="search-results" id="search-results"></div>
+    <div class="container">
+        <div class="sidebar">
+            <h2>User Settings</h2>
+            <ul>
+                <li class="active">Profile</li>
+                <li>Accounts</li>
+                <li>Integrations</li>
+            </ul>
+            <h2>App Settings</h2>
+            <ul>
+                <li>General</li>
+                <li>Calendars</li>
+                <li>Appearance</li>
+                <li>Meetings</li>
+            </ul>
+            <ul>
+                <li>Quick Access</li>
+                <li>Shortcuts</li>
+                <li>Download apps</li>
+            </ul>
+            <ul>
+                <li>What's new</li>
+                <li>Invite friends</li>
+                <li>Send feedback</li>
+            </ul>
+            <ul>
+                <li class="log-out">Log out</li>
+            </ul>
+        </div>
+        <div class="content">
+            <div class="close-button">&times;</div>
+            <h1>Profile</h1>
+            <div class="profile-header">
+                <div class="avatar">J</div>
+                <div class="profile-info">
+                    <h2>John Smith</h2>
+                    <p>jsmith.mobbin@gmail.com</p>
+                </div>
+                <a href="#" class="visit-profile">Visit profile</a>
+            </div>
+            <div class="form-group">
+                <h2>Birthday</h2>
+                <p class="description">Set your birthday. Only day and month will be visible.</p>
+                <div class="birthday-inputs">
+                    <div class="form-group">
+                        <label for="month">Month</label>
+                        <input type="text" id="month" placeholder="e.g. March">
+                    </div>
+                    <div class="form-group">
+                        <label for="day">Day</label>
+                        <input type="text" id="day" placeholder="e.g. 11">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <h2>Location</h2>
+                <p class="description">Set your current location.</p>
+                <input type="text" id="location" placeholder="e.g Berlin, Germany">
+            </div>
+            <div class="form-group">
+                <h2>Twitter</h2>
+                <p class="description">Your <span class="twitter-link">Twitter</span> handle. Visible to everyone.</p>
+                <input type="text" id="twitter" placeholder="e.g @elonmusk">
             </div>
         </div>
-
-        <div class="load-more-wrapper" id="load-more-wrapper"></div>
-        
-        <div class="search-wrapper">
-            <input class="search-bar" id="search-input" placeholder="Search for your favorite moment...">
-            <button class="search-button" id="search-button">Search</button>
+    </div>
+    <div class="footer">
+        <div class="footer-left">
+            <div class="footer-avatar">A</div>
+            <span>Amie</span>
         </div>
-        
-    </section>
+        <div class="footer-right">
+            curated by Mobbin
+        </div>
+    </div>
 </body>
 </html>
