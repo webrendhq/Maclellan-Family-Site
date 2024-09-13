@@ -29,12 +29,3 @@ document.addEventListener('DOMContentLoaded', () => {
         signOutButton.addEventListener('click', handleSignOut);
     }
 });
-
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // User is signed in, continue to show the restricted page.
-    } else {
-      // No user is signed in, redirect to login page.
-      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index.html';
-    }
-});
