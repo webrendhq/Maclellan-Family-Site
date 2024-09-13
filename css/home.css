@@ -18,6 +18,8 @@ body {
     padding: 4px;
     padding-bottom: 15px;
     border-radius: 25px 25px 0px 0px;
+    color: #F3EEE1;
+    text-emphasis-color: white;
 }
 
 .nav-bar {
@@ -67,6 +69,7 @@ body {
     cursor: pointer;
     height: 100%;
     background-color: brown;
+    color: #F3EEE1;
 }
 
 .nav-button{
