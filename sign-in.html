@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Maclellen Family</title>
     <link rel="stylesheet" href="css/sign-in.css">
+    <script src="js/sign-in.js"></script>
     <script src="js/firebase_init.js"></script>
     
 </head>
@@ -22,24 +23,25 @@
 
 
         <div class="firebase-auth-wrapper">
-            <div class="sign-up-wrapper">
+            <div class="sign-up-wrapper" id="sign-up-wrapper">
                 <h3>Sign Up</h3>
+                <input class="name-input" id ="signin-name" placeholder="Name" type="plain">
                 <input class="email-input" id="signup-email" placeholder="Email">
                 <input class="password-input" id="signup-password" placeholder="Password">
                 <button class="sign-up-button" id="signup-button">Sign Up</button>   
                 <div class="firebase-panel-prompt">
                     <p>Already have an account?</p>
-                    <a>Sign In</a>
+                    <button id="signin-choice">Sign In</button>
                 </div>
             </div>
-            <div class="sign-in-wrapper">
+            <div class="sign-in-wrapper" id="sign-in-wrapper">
                 <h3>Sign In</h3>
-                <input class="name-input" id ="signin-name" placeholder="Name" type="plain">
                 <input class="email-input" id ="signin-email" placeholder="Email" type="email">
-                <input class="password-input" id="signin-password" placeholder="Password" type="password">>
+                <input class="password-input" id="signin-password" placeholder="Password" type="password">
                 <button class="sign-in-button" id="signin-button">Sign In</button> 
                 <div class="firebase-panel-prompt">
                     <p>Don't have an account?</p>
+                    <button id="signup-choice">Sign Up</button>
                 </div>  
             </div>
         </div>

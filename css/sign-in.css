@@ -75,19 +75,7 @@ input{
     transition: all .2s ease-in-out
 }
 
-.sign-in-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    justify-content: center;
-    align-items: center;
-    flex: 0 0;
-    width: 100%;
-    height: 100%;
-    padding: 5%;
-    position: absolute;
-    
-}
+
 .sign-up-wrapper {
     display: flex;
     flex-direction: column;
@@ -99,10 +87,33 @@ input{
     padding: 5%;
     position: absolute;
     flex: 0 0;
+    background-color: white;
+    z-index: 1;
 
 }
+.sign-in-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+    align-items: center;
+    flex: 0 0;
+    width: 100%;
+    height: 100%;
+    padding: 5%;
+    position: absolute;
+    background-color: white;
+    z-index: 0;
+    
+}
+
 
 .firebase-panel-prompt{
     font-family: 'GazpachoBlackItalic';
     font-size: 12px;
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    justify-content: center;
+    align-items: center;
 }
