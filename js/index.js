@@ -2,10 +2,9 @@ import { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, s
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
-      // User is signed in, continue to show the restricted page.
+        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/home.html';
     } else {
       // No user is signed in, redirect to login page.
-      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/home.html';
     }
 });
 
