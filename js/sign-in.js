@@ -121,18 +121,9 @@ async function handleSignIn(e) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const signupForm = document.getElementById('signup-form');
-    const signinForm = document.getElementById('signin-form');
-
-    if (signupForm) {
-        signupForm.addEventListener('submit', handleSignUp);
-    }
-
-    if (signinForm) {
-        signinForm.addEventListener('submit', handleSignIn);
-    }
-});
+// Attach event listeners to the form elements
+document.getElementById('signup-form').addEventListener('submit', handleSignUp);
+document.getElementById('signin-form').addEventListener('submit', handleSignIn);
 
 // if (signOutButton) signOutButton.addEventListener('click', handleSignOut);
 
