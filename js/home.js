@@ -16,17 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // User is signed in, continue to show the restricted page.
-    } else {
-      // No user is signed in, redirect to login page.
-      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index.html';
-    }
-});
   
-
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
@@ -239,3 +229,12 @@ loadMoreButton.style.display = 'none';
 loadMoreButton.addEventListener('click', loadMoreFiles);
 
 loadMoreWrapper.appendChild(loadMoreButton);
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // User is signed in, continue to show the restricted page.
+    } else {
+      // No user is signed in, redirect to login page.
+      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index.html';
+    }
+});
