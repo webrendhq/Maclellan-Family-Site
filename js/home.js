@@ -2,6 +2,7 @@
 import { refreshDropboxAccessToken, createDropboxInstance, getDropboxInstance, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 
 
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
       // User is signed in, continue to show the restricted page.
