@@ -124,15 +124,13 @@ async function handleSignIn(e) {
 document.addEventListener('DOMContentLoaded', function() {
     const signupForm = document.getElementById('signup-form');
     const signinForm = document.getElementById('signin-form');
-    const signupButton = document.getElementById('signup-button');
-    const signinButton = document.getElementById('signin-button');
 
-    if (signupForm && signupButton) {
-        signupButton.addEventListener('click', handleSignUp);
+    if (signupForm) {
+        signupForm.addEventListener('submit', handleSignUp);
     }
 
-    if (signinForm && signinButton) {
-        signinButton.addEventListener('click', handleSignIn);
+    if (signinForm) {
+        signinForm.addEventListener('submit', handleSignIn);
     }
 });
 
