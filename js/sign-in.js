@@ -3,7 +3,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, getDocs , collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-import { dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+import { getDropboxInstance } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 
 
 let cursor = null;
@@ -27,6 +27,8 @@ async function getUserCount() {
     const querySnapshot = await getDocs(collection(db, "users"));
     return querySnapshot.size;
 }
+
+const dbx = await getDropboxInstance();
 
 // Handle sign-up
 async function handleSignUp(e) {
