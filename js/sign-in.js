@@ -48,7 +48,7 @@ async function handleSignUp(e) {
 
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        const uniqueKey = generateUniqueKey();
+        
         console.log('User successfully created: ' + user.email);
 
         const folderPath = `/${name}`;
@@ -73,7 +73,7 @@ async function handleSignUp(e) {
             name: name,
             email: user.email,
             role: 'user',
-            content: `This is the personalized content for ${email}. Your unique key is ${uniqueKey}.`,
+            
             folderPath: folderPath
         });
 
