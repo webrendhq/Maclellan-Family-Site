@@ -96,6 +96,7 @@ body {
     height: 100%;
     cursor: pointer;
     flex-grow: 1;
+    background-color: transparent;
 }
 
 .random-pictures-temp-div{
@@ -110,4 +111,8 @@ body {
     height: 40px;
     position: relative;
     z-index: 1;
+}
+
+.sign-out-button{
+    background-color: transparent;
 }
