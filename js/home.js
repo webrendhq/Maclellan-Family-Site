@@ -2,6 +2,16 @@
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, db, app, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
   
+
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // User is signed in, continue to show the restricted page.
+    } else {
+      // No user is signed in, redirect to login page.
+      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index';
+    }
+});
+
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
@@ -215,11 +225,3 @@ loadMoreButton.addEventListener('click', loadMoreFiles);
 
 loadMoreWrapper.appendChild(loadMoreButton);
 
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // User is signed in, continue to show the restricted page.
-    } else {
-      // No user is signed in, redirect to login page.
-      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index.html';
-    }
-});
