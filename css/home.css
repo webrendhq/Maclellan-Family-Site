@@ -20,6 +20,8 @@ body {
     border-radius: 25px 25px 0px 0px;
     color: #F3EEE1;
     text-emphasis-color: white;
+    position: relative;
+    z-index: 1;
 }
 
 .nav-bar {
@@ -83,6 +85,8 @@ body {
     align-items: center;
     overflow: hidden;
     border-radius: 20px;
+    position: relative;
+    z-index: 1;
 }
 
 .nav-button{
@@ -102,4 +106,6 @@ body {
 
 .load-more-wrapper{
     height: 40px;
+    position: relative;
+    z-index: 1;
 }

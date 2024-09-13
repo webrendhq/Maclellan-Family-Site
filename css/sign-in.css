@@ -31,11 +31,17 @@ body {
 
 }
 
+.sign-in-photo{
+    background-image: url(images/maclellan-signin.jpg);
+}
+
 input{
-    border-radius: 16px;
+    border-radius: 50px;
     padding: 8px 16px 8px 16px;
-    border-color: transparent;
-    width: 100%;
+    border-color: rgba(0, 0, 0, 0.279);
+    border-width: 1px;
+    width: 80%;
+    margin-bottom: 4px;
     
 }
 
@@ -43,12 +49,13 @@ input{
     border-radius: 50px;
     padding: 8px 16px 8px 16px;
     border-color: transparent;
-    width: 100%;
+    width: 90%;
     cursor: pointer;
 }
 
 .sign-in-button:hover{
     opacity: 50%;
+    box-shadow: 10px 10px 10px;
     transition: all .2s ease-in-out
 }
 
@@ -61,12 +68,13 @@ input{
     border-radius: 50px;
     padding: 8px 16px 8px 16px;
     border-color: transparent;
-    width: 100%;
+    width: 90%;
     cursor: pointer;
 }
 
 .sign-up-button:hover{
     opacity: 50%;
+    box-shadow: 10px 10px 10px;
     transition: all .2s ease-in-out
 }
 
