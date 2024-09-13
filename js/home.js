@@ -1,3 +1,8 @@
+// Import the functions you need from the SDKs you need
+import { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { refreshDropboxAccessToken, createDropboxInstance, getDropboxInstance, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+import { query, getDocs, collection, where } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { getUserCount, updateTotalFileCount } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/usercount.js';
 
 
 
