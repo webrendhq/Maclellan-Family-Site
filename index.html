@@ -8,17 +8,41 @@
     
 </head>
 <body>
-    <section class="pictures-section">
+    <section class="homescreen-section">
+        <div class="welcome-wrapper">
+            <h1>The Maclellen Family</h1>
+            <button class="enter-site-button">Enter</button>
+        </div>
+
+
+
+
+
+
+
+
+
+
+
         <div class="firebase-auth-wrapper">
             <div class="sign-up-wrapper">
+                <h3>Sign Up</h3>
                 <input class="email-input" id="signup-email" placeholder="Email">
                 <input class="password-input" id="signup-password" placeholder="Password">
-                <button class="signup-button" id="signup-button">Sign Up</button>   
+                <button class="sign-up-button" id="signup-button">Sign Up</button>   
+                <div class="firebase-panel-prompt">
+                    <p>Already have an account?</p>
+                </div>
             </div>
             <div class="sign-in-wrapper">
-                <input class="email-input" id ="signin-email" placeholder="Email">
-                <input class="password-input" id="signin-password" placeholder="Password">
-                <button class="sign-in-button" id="signin-button">Sign In</button>   
+                <h3>Sign In</h3>
+                <input class="name-input" id ="signin-name" placeholder="Name" type="plain">
+                <input class="email-input" id ="signin-email" placeholder="Email" type="email">
+                <input class="password-input" id="signin-password" placeholder="Password" type="password">>
+                <button class="sign-in-button" id="signin-button">Sign In</button> 
+                <div class="firebase-panel-prompt">
+                    <p>Don't have an account?</p>
+                </div>  
             </div>
         </div>
     </section>

@@ -1,7 +1,7 @@
 body {
     background-color: #161920;
 }
-.pictures-section {
+.homescreen-section {
     z-index: 0;
     flex-flow: column;
     justify-content: center;
@@ -14,30 +14,58 @@ body {
 }
 
 .firebase-auth-wrapper {
-    display: flex;
+    display: none;
     flex-direction: row;
     gap: 16px;
     justify-content: center;
     align-items: center;
     padding: 16px;
     background: white;
-    border-radius: 20px;
+    border-radius: 16px;
+    width: 50rem;
+    height: 30rem;
 }
 
 input{
     border-radius: 16px;
     padding: 8px 16px 8px 16px;
-    border-color: white;
+    border-color: transparent;
+    width: 100%;
+    
 }
 
 .sign-in-button {
     border-radius: 50px;
     padding: 8px 16px 8px 16px;
+    border-color: transparent;
+    width: 100%;
+}
+
+.sign-in-button:hover{
+    opacity: 50%;
+    transition: all .2s ease-in-out
+}
+
+.sign-in-button:not(:hover){
+    opacity: 100%;
+    transition: all .2s ease-in-out
 }
 
 .sign-up-button {
     border-radius: 50px;
     padding: 8px 16px 8px 16px;
+    border-color: transparent;
+    width: 100%;
+}
+
+.sign-up-button:hover{
+    opacity: 50%;
+    transition: all .2s ease-in-out
+}
+
+.sign-up-button:not(:hover){
+    opacity: 100%;
+    transition: all .2s ease-in-out
 }
 
 .sign-in-wrapper {
@@ -46,6 +74,10 @@ input{
     gap: 4px;
     justify-content: center;
     align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 5%;
+    position: relative;
 }
 .sign-up-wrapper {
     display: flex;
@@ -53,4 +85,13 @@ input{
     gap: 4px;
     justify-content: center;
     align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 5%;
+    position: relative;
+}
+
+.firebase-panel-prompt{
+    font-family: 'GazpachoBlackItalic';
+    font-size: 12px;
 }
