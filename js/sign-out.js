@@ -6,7 +6,7 @@ function handleSignOut() {
     signOut(auth).then(() => {
       // Refreshes the current page
       console.log('User signed out');
-      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index.html';
+      window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/index';
     }).catch((error) => {
       console.log(error.message);
     });

@@ -2,7 +2,7 @@ import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/home.html';
+        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/home';
     } else {
       // No user is signed in, redirect to login page.
     }
@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const button = document.getElementById('enter-site-button');
     
     button.addEventListener('click', function() {
-        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/sign-in.html';
+        window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/sign-in';
     });
 });
 
