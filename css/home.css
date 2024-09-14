@@ -1,21 +1,21 @@
 body {
-    background-color: rgb(0, 0, 0);
+    overflow:hidden;
 }
 
 .search-bar {
     width: 35rem;
     height: 35px;
-    background-color: #f3eee1;
+    background-color: #ffffff;
     border-radius: 50px;
     padding-left: 15px;
-    border-color: rgba(127, 127, 127, 0.383);
+    border-color: rgba(255, 255, 255, 0.383);
     flex-grow: 1;
 }
 
 .search-wrapper{
     border-width: 10px;
     border-color: #666666;
-    background-color: #fffcf372;
+    background-color: rgba(255, 235, 205, 0.388);
     padding: 4px;
     padding-bottom: 15px;
     border-radius: 25px 25px 0px 0px;
@@ -67,7 +67,7 @@ body {
     right: 0%;
     bottom: 0%;
     overflow: none;
-    background-image: url(../images/maclellan-bg.jpg);
+    /* background-image: url(../images/maclellan-bg.jpg); */
 }
 
 .search-contents{
@@ -120,7 +120,7 @@ body {
     top: 0%;
     left: 0%;
     z-index: 0;
-    background-image: url(../images/maclellan-bg.jpg);
+    /* background-image: url(../images/maclellan-bg.jpg); */
 }
 
 .load-more-wrapper{
@@ -141,7 +141,7 @@ body {
 
 .section-folders{
     width: 98%;
-    height: 100%;
+    height: 98%;
     margin-left: auto;
     margin-right: auto;
     margin-top: 16px;
@@ -152,9 +152,43 @@ body {
     
     overflow: hidden;
     position: absolute;
-    top: 0%;
+    top: auto;
     left: 0%;
     bottom: 0%;
     right: 0%;
     z-index: 0;
+    border-width: 10px;
+    border-top: 3px solid black;
+    border-left: 3px solid black;
+    border-right: 3px solid black;
+    background-color: whitesmoke;
+    background-image: url('src/maclellen-bg.jpg');
+    background-repeat: no-repeat;  
+    background-size: cover;
+}
+
+
+/* Moving Gradient Background */
+@keyframes gradientAnimation {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.moving-gradient {
+    background: linear-gradient(-45deg, #8A2BE2, #4169E1, #9400D3, #1E90FF);
+    background-size: 400% 400%;
+    animation: gradientAnimation 15s ease infinite;
+    
+    width: 100%;
+    height: 100%;
+    
+    /* Optional: Set minimum dimensions if applied to a container */
+    min-height: 100vh;
 }
