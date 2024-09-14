@@ -137,6 +137,7 @@ body {
 .sign-out-button{
     background-color: transparent;
     border-color: transparent;
+    cursor: pointer;
 }
 
 .section-folders{
