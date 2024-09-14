@@ -9,6 +9,8 @@ onAuthStateChanged(auth, (user) => {
     } else {
       // No user is signed in, redirect to login page.
     //   window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/';
+
+    // REMMEBER TO UNCOMMENT THAT LINE ABOVE ME ^^^^^^^^ WHEN YOURE DONE WITH CODING
     }
 });
 
