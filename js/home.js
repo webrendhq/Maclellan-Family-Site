@@ -32,7 +32,10 @@ function createYearSelect() {
     
     // Generate options for the last 10 years
     const currentYear = new Date().getFullYear();
-    for (let i = 0; i < 10; i++) {
+    const selectOption = document.createElement('option');
+    selectOption.textContent = 'Select Year';
+    select.appendChild(selectOption);
+    for (let i = 0; i < 20; i++) {
         const option = document.createElement('option');
         option.value = currentYear - i;
         option.textContent = currentYear - i;
