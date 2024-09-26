@@ -8,7 +8,7 @@ onAuthStateChanged(auth, (user) => {
       // User is signed in, continue to show the restricted page.
     } else {
       // No user is signed in, redirect to login page.
-    //   window.location.href = 'https://webrendhq.github.io/Maclellan-Frontend/';
+    //   window.location.href = 'https://kevinveragit.github.io/Maclellan-Frontend/';
 
     // REMMEBER TO UNCOMMENT THAT LINE ABOVE ME ^^^^^^^^ WHEN YOURE DONE WITH CODING
     }
