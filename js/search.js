@@ -1,10 +1,30 @@
+// Import the functions you need from the SDKs you need
+import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
 let hasMore = false;
 
+// Function to update the URL with the search query
+function updateURLWithQuery(query) {
+    const url = new URL(window.location);
+    url.searchParams.set('query', query);
+    window.history.pushState({}, '', url);
+}
+
+// Function to get the query from the URL parameters
+function getQueryFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('query') || "";
+}
+
+
+
 // Function to search Dropbox files and append results
 async function searchDropboxFiles(query, startIndex = 0) {
+    console.log("Searching Dropbox files with query:", query);
     await refreshDropboxAccessToken(); // Ensure the access token is fresh
     let searchResults = [];
     
@@ -57,12 +77,13 @@ async function searchDropboxFiles(query, startIndex = 0) {
         console.error('Error during search or continue search:', error);
     }
 
+    console.log("Search results:", searchResults);
     return searchResults;
 }
 
 // Function to append search results to the DOM
 async function appendResults(results) {
-    const container = document.getElementById('search-results');
+    const container = document.getElementById('search-grid');
     if (startIndex === 0) {
         container.innerHTML = ''; // Clear previous results only on new search
     }
@@ -163,6 +184,45 @@ async function appendResults(results) {
     }
 }
 
+async function handleSearch(query) {
+    console.log("handleSearch called with query:", query);
+    if (query) {
+        // Update URL with the current query
+        updateURLWithQuery(query);
+
+        startIndex = 0;
+        cursor = null; // Reset cursor for new search
+        currentQuery = query;
+        const results = await searchDropboxFiles(query);
+        await appendResults(results);
+    }
+}
+
+// Separate function to initialize search from URL
+async function initializeSearchFromURL() {
+    console.log("initializeSearchFromURL called");
+    const queryFromURL = getQueryFromURL();
+    console.log("Query from URL:", queryFromURL);
+    
+    if (queryFromURL) {
+        document.getElementById('search-input').value = queryFromURL; // Populate search input with the query from URL
+        await handleSearch(queryFromURL);
+    } else {
+        console.log("No query found in URL");
+    }
+}
+
+async function initialize() {
+    console.log("Initializing...");
+    try {
+        await refreshDropboxAccessToken();
+        console.log("Dropbox token refreshed");
+        await initializeSearchFromURL();
+    } catch (error) {
+        console.error("Error during initialization:", error);
+    }
+}
+
 function appendLoadMoreButton() {
     const loadMoreButton = document.getElementById('load-more-button');
     loadMoreButton.style.display = 'flex';
@@ -178,26 +238,16 @@ async function loadMoreFiles() {
     await appendResults(results);
 }
 
-// Function to handle the search
-async function handleSearch() {
-    const searchInput = document.getElementById('search-input');
-    currentQuery = searchInput.value.trim();
-    
-    if (currentQuery) {
-        startIndex = 0;
-        cursor = null; // Reset cursor for new search
-        const results = await searchDropboxFiles(currentQuery);
-        await appendResults(results);
-    }
-}
-
 // Add event listener to search button
-document.getElementById('search-button').addEventListener('click', handleSearch);
+document.getElementById('search-button').addEventListener('click', () => {
+    const searchInput = document.getElementById('search-input');
+    handleSearch(searchInput.value.trim());
+});
 
 // Add event listener for pressing Enter in the search input
 document.getElementById('search-input').addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
-        handleSearch();
+        handleSearch(this.value.trim());
     }
 });
 
@@ -208,3 +258,27 @@ loadMoreButton.id = 'load-more-button';
 loadMoreButton.innerText = 'Load More';
 loadMoreButton.style.display = 'none';
 loadMoreButton.addEventListener('click', loadMoreFiles);
+
+loadMoreWrapper.appendChild(loadMoreButton);
+
+
+// At the end of your script file, replace the DOMContentLoaded event listener with this:
+
+function domReady(fn) {
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+        setTimeout(fn, 1);
+    } else {
+        document.addEventListener("DOMContentLoaded", fn);
+    }
+}
+
+domReady(function() {
+    console.log("DOM is ready");
+    initialize();
+});
+
+// If you want to be extra sure, you can also add this:
+if (document.readyState === "complete") {
+    console.log("Document already complete, initializing...");
+    initialize();
+}

@@ -56,7 +56,14 @@ function addYearLink(year, gridId) {
         const link = document.createElement('a');
         link.id = `${gridId}-${year}`;
         link.textContent = year;
-        link.href = `/family-events.html?year=${year}`;
+        
+        // Set different href based on the grid
+        if (gridId === 'family-years') {
+            link.href = `/family-events.html?year=${year}`;
+        } else if (gridId === 'your-years') {
+            link.href = `/your-events.html?year=${year}`;
+        }
+
         link.addEventListener('click', (e) => {
             e.preventDefault();
             window.year = year;
