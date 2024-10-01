@@ -25,7 +25,7 @@ onAuthStateChanged(auth, async (user) => {
         }
     } else {
         // No user is signed in, redirect to login page.
-        window.location.href = 'https://kevinveragit.github.io/Maclellan-Frontend/';
+        window.location.href = '/';
     }
 });
 

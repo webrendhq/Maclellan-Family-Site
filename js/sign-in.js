@@ -65,7 +65,7 @@ async function handleSignUp(e) {
         });
 
         console.log('User document created with content and folder path.');
-        window.location.href = 'https://kevinveragit.github.io/Maclellan-Frontend/home';
+        window.location.href = '/picture-of-the-day.html';
 
     } catch (error) {
         const errorMessage = error.message;
@@ -92,7 +92,7 @@ async function handleSignIn(e) {
         if (userDoc.exists()) {
             const userData = userDoc.data();
             console.log(`User document data: ${JSON.stringify(userData)}`);
-            window.location.href = 'https://kevinveragit.github.io/Maclellan-Frontend/home';
+            window.location.href = '/pictureoftheday.html';
         } else {
             console.log("No such document!");
         }

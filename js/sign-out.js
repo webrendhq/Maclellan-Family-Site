@@ -6,7 +6,7 @@ function handleSignOut() {
     signOut(auth).then(() => {
       // Refreshes the current page
       console.log('User signed out');
-      window.location.href = 'https://kevinveragit.github.io/Maclellan-Frontend/';
+      window.location.href = '/';
     }).catch((error) => {
       console.log(error.message);
     });
