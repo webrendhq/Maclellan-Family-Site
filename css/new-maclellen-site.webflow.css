@@ -673,9 +673,10 @@
   z-index: 1;
   opacity: .95;
   background-color: #adadad;
-  background-image: url('https://d3e54v103j8qbb.cloudfront.net/img/background-image.svg');
-  background-position: 0 0;
-  background-size: auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  overflow: auto;
   border-radius: 0;
   width: 50%;
   height: 65%;
