@@ -92,7 +92,7 @@ async function handleSignIn(e) {
         if (userDoc.exists()) {
             const userData = userDoc.data();
             console.log(`User document data: ${JSON.stringify(userData)}`);
-            window.location.href = '/pictureoftheday.html';
+            window.location.href = '/picture-of-the-day.html';
         } else {
             console.log("No such document!");
         }

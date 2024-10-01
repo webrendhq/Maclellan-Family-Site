@@ -14,7 +14,7 @@ function handleSignOut() {
 
 // Add event listener for sign-out button
 document.addEventListener('DOMContentLoaded', () => {
-    const signOutButton = document.getElementById('sign-out');
+    const signOutButton = document.getElementById('signout');
     if (signOutButton) {
         signOutButton.addEventListener('click', handleSignOut);
     }
