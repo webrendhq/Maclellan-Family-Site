@@ -208,7 +208,7 @@
                 </div><input id="update-email-button" type="submit" data-wait="Please wait..." class="button-2 auto w-button" value="Update Email">
               </div>
               <div class="profile-row"><label for="name" class="profile-label">Email Address<br></label>
-                <div class="profile-input-wrapper"><input class="input w-input" maxlength="256" name="Email" data-name="Email" placeholder="" type="email" id="email" required="">
+                <div class="profile-input-wrapper"><input class="input w-input" maxlength="256" name="Email" data-name="Email" placeholder="" type="email" id="new-email" required="">
                   <div><span class="profile_label-sub">Any social login connections will be removed.</span></div>
                 </div>
               </div>
@@ -223,12 +223,15 @@
         </div>
         <div data-w-tab="Password" class="w-tab-pane">
           <div class="no-margin w-form">
-            <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="get" data-ms-form="password" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af133">
+            
+            <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="POST" data-ms-form="new-email-form" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af133">
               <div class="profile_form-header">
                 <div>
                   <div class="profile-h1">Change your email</div>
                 </div><input id="update-password-button" type="submit" data-wait="Please wait..." class="button-2 auto w-button" value="Update Password">
               </div>
+            </form>
+            <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="POST" data-ms-form="new-password-form" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af133"></form>
               <div data-ms-content="has-password" class="profile-row"><label for="email" class="profile-label">Current Password</label>
                 <div data-ms-content="has-password" class="profile-input-wrapper"><input class="input w-input" maxlength="256" name="email-3" data-name="Email 3" placeholder="" type="password" id="current-password" required=""></div>
               </div>

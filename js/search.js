@@ -81,17 +81,34 @@ async function searchDropboxFiles(query, startIndex = 0) {
     return searchResults;
 }
 
+const itemClasses = [
+    "bento-grid-family-photo w-node-_94965c23-ae8a-8ce0-e964-880b257bc7b7-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-ec6869a4-d13b-cd8c-e6dd-19dda5ef75a4-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-dccce7c7-c208-2da0-de4a-34a8011fdf92-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_9225746e-1b4e-b654-ae25-f860cb774aa7-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_4f41c8bf-ce48-cfea-1c26-9fa79bee9afc-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_3945aeda-f377-0051-274a-20cc734dc9f8-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_5f1a6629-3047-f65e-2a71-339c12d0b905-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_6793b981-9fe9-6b6a-f2aa-585dbcaf6bc-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_5e5a805e-3778-fd3c-f49f-faf8b86c33bb-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-_4c6d9103-222a-7e47-8b80-c0c1af28f0f-b5c26c10 w-inline-block",
+    "bento-grid-family-photo w-node-e18d4e44-b537-61bd-0245-f90047d328d8-b5c26c10 w-inline-block"
+];
+
+let currentItemIndex = 0;
+
 // Function to append search results to the DOM
 async function appendResults(results) {
     const container = document.getElementById('search-grid');
     if (startIndex === 0) {
         container.innerHTML = ''; // Clear previous results only on new search
+        currentItemIndex = 0; // Reset the item index on new search
     }
 
     let appendedCount = 0;
 
     for (const file of results) {
-        if (appendedCount >= 25) { // Stop appending after 25 elements
+        if (appendedCount >= 11 || currentItemIndex >= 11) { // Stop appending after 11 elements
             break;
         }
         if (file['.tag'] === 'file') {
@@ -152,6 +169,7 @@ async function appendResults(results) {
                             mediaElement.src = previewUrl;
 
                             const wrapper = document.createElement('div');
+                            wrapper.className = itemClasses[currentItemIndex]; // Assign the appropriate class
                             wrapper.style.position = 'relative';
                             wrapper.style.display = 'inline-block';
                             wrapper.appendChild(mediaElement);
@@ -165,6 +183,7 @@ async function appendResults(results) {
 
                             appendedCount++;
                             startIndex++;
+                            currentItemIndex++;
                         }
                     } else {
                         console.error('Error getting temporary link:', tempLinkResponse.statusText);
@@ -176,8 +195,8 @@ async function appendResults(results) {
         }
     }
 
-    // Show "Load More" button if there are more results or we've appended less than 25 items
-    if (hasMore || appendedCount === 25) {
+    // Show "Load More" button if there are more results and we've appended less than 11 items
+    if (hasMore && appendedCount === 11) {
         appendLoadMoreButton();
     } else {
         hideLoadMoreButton();
@@ -234,6 +253,9 @@ function hideLoadMoreButton() {
 }
 
 async function loadMoreFiles() {
+    if (currentItemIndex >= 11) {
+        currentItemIndex = 0; // Reset to start assigning classes from the beginning
+    }
     const results = await searchDropboxFiles(currentQuery, startIndex);
     await appendResults(results);
 }

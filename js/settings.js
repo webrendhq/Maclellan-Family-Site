@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     // change email listener
-    const changeEmailForm = document.getElementById('change-email-form');
+    const changeEmailForm = document.getElementById('update-email-button');
     if (changeEmailForm) {
         changeEmailForm.addEventListener('submit', handleChangeEmail, true);
     }
