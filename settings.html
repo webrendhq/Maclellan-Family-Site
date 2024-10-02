@@ -21,6 +21,8 @@
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script type="module" src="js/settings.js"></script>
   <script type="module" src="js/sign-out.js"></script>
+  <script type="module" src="js/browse-years-nav.js"></script>
+  <!-- <script type="module" src="js/search.js"></script> -->
   
   
   
@@ -49,21 +51,6 @@
         </div>
         <div class="div-block-16"></div>
         <div id="family-years" class="div-block-15">
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2018</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2018</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2018</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2018</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2018</div>
-          </a>
         </div>
       </div>
       <div class="nav-buttons you">
@@ -73,21 +60,6 @@
         </div>
         <div class="div-block-16"></div>
         <div id="your-years" class="div-block-15">
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2017</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2017</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2017</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2017</div>
-          </a>
-          <a href="#" class="year w-inline-block">
-            <div class="text-block-3">2017</div>
-          </a>
         </div>
       </div>
     </div>
@@ -198,7 +170,16 @@
         </div>
         <div data-w-tab="Email" class="w-tab-pane">
           <div class="no-margin w-form">
-            <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="get" data-ms-form="email" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af11c">
+            <form id="change-email-form">
+              <label for="email">New Email:</label>
+              <input type="email" id="email" name="email" required>
+              <button type="submit">Change Email</button>
+            </form>
+            <button id="verify-email">Verify Email</button>
+
+
+
+            <!-- <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="get" data-ms-form="email" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af11c">
               <div class="profile_form-header">
                 <div>
                   <div class="profile-h1">Change your email</div>
@@ -209,7 +190,7 @@
                   <div><span class="profile_label-sub">Any social login connections will be removed.</span></div>
                 </div>
               </div>
-            </form>
+            </form> -->
             <div class="w-form-done">
               <div>Thank you! Your submission has been received!</div>
             </div>
@@ -221,23 +202,16 @@
         <div data-w-tab="Password" class="w-tab-pane">
           <div class="no-margin w-form">
             
-            <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="POST" data-ms-form="new-email-form" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af133">
-              <div class="profile_form-header">
-                <div>
-                  <div class="profile-h1">Change your email</div>
-                </div><input id="update-password-button" type="submit" data-wait="Please wait..." class="button-2 auto w-button" value="Update Password">
-              </div>
+            <form id="change-password-form">
+              <label for="current-password">Current Password:</label>
+              <input type="password" id="current-password" name="current-password" required>
+              
+              <label for="new-password">New Password:</label>
+              <input type="password" id="new-password" name="new-password" required>
+              
+              <button type="submit">Change Password</button>
             </form>
-            <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="POST" data-ms-form="new-password-form" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af133"></form>
-              <div data-ms-content="has-password" class="profile-row"><label for="email" class="profile-label">Current Password</label>
-                <div data-ms-content="has-password" class="profile-input-wrapper"><input class="input w-input" maxlength="256" name="email-3" data-name="Email 3" placeholder="" type="password" id="current-password" required=""></div>
-              </div>
-              <div class="profile-row no-line"><label for="email" class="profile-label">New Password</label>
-                <div class="profile-input-wrapper"><input class="input w-input" maxlength="256" name="email-3" data-name="Email 3" placeholder="" type="password" id="new-password" required="">
-                  <div><span class="profile_label-sub">Minimum 8-characters.</span></div>
-                </div>
-              </div>
-            </form>
+
             <div class="w-form-done">
               <div>Thank you! Your submission has been received!</div>
             </div>
@@ -248,17 +222,27 @@
         </div>
         <div data-w-tab="Checklist" class="w-tab-pane">
           <div class="no-margin w-form">
-            <form id="wf-form-Profile-Form" name="wf-form-Profile-Form" data-name="Profile Form" method="get" class="profile-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af162">
+            <form id="wf-form-Password-Form" name="wf-form-Password-Form" data-name="Password Form" method="post" action="javascript:void(0)" data-ms-form="new-password-form" class="memberstack-form" data-form-type="password">
               <div class="profile_form-header">
                 <div>
-                  <div class="profile-h1">Setup Checklist</div>
-                  <div class="profile_sub-head">You can enable or disable the setup checklist below. </div>
+                  <div class="profile-h1">Change your password</div>
                 </div>
+                <input id="update-password-button" type="submit" data-wait="Please wait..." class="button-2 auto w-button" value="Update Password">
               </div>
               <div class="profile-row">
-                <div class="profile-label">Enable Checklist</div>
-                <div class="profile-input-wrapper"><label class="w-checkbox"><input id="checkbox-2" type="checkbox" name="checkbox-2" data-name="Checkbox 2" class="w-checkbox-input profile-checkbox" checked=""><span class="hide w-form-label" for="checkbox-2"></span></label></div>
+                <label for="current-password" class="profile-label">Current Password</label>
+                <div class="profile-input-wrapper">
+                  <input class="input w-input" maxlength="256" name="current-password" data-name="Current Password" placeholder="" type="password" id="current-password" required="">
+                </div>
               </div>
+              <div class="profile-row no-line">
+                <label for="new-password" class="profile-label">New Password</label>
+                <div class="profile-input-wrapper">
+                  <input class="input w-input" maxlength="256" name="new-password" data-name="New Password" placeholder="" type="password" id="new-password" required="">
+                  <div><span class="profile_label-sub">Minimum 8-characters.</span></div>
+                </div>
+              </div>
+              <div id="change-password-message"></div>
             </form>
             <div class="recently-uploaded">
               <div class="recently-uploaded-desc">

@@ -1,8 +1,3 @@
-
-
-
-
-
 // Function to check URL and update h1 text
 function updateH1BasedOnURL() {
     // Get the current URL pathname

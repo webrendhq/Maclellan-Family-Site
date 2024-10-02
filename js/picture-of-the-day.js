@@ -5,6 +5,7 @@ const listFolderUrl = 'https://api.dropboxapi.com/2/files/list_folder';
 const listFolderContinueUrl = 'https://api.dropboxapi.com/2/files/list_folder/continue';
 const getTemporaryLinkUrl = 'https://api.dropboxapi.com/2/files/get_temporary_link';
 
+
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         // User is signed in, fetch their folder path
