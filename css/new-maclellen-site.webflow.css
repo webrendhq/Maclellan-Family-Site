@@ -582,6 +582,7 @@
   justify-content: flex-start;
   align-items: center;
   display: flex;
+  flex-direction: column;
 }
 
 .div-block-16 {
@@ -1034,12 +1035,12 @@
 
 .search-bento-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(6, 15%);
   grid-template-rows: repeat(8, 1fr);
   gap: 16px;
-  width: 75%;
+  width: 90%;
   height: auto;
-  min-height: 100vh;
+  
   margin: 10vh auto 0;
   padding: 16px 16px 5vw;
   position: relative;

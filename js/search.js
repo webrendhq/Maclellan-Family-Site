@@ -2,6 +2,26 @@
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        // User is signed in, fetch their folder path
+        try {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+                userFolderPath = userDoc.data().folderPath;
+                console.log('User folder path:', userFolderPath);
+            } else {
+                console.error('No folder path found for user:', user.email);
+            }
+        } catch (error) {
+            console.error('Error fetching user folder path:', error);
+        }
+    } else {
+        // No user is signed in, redirect to login page.
+        window.location.href = '/';
+    }
+});
+
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
@@ -81,6 +101,23 @@ async function searchDropboxFiles(query, startIndex = 0) {
     return searchResults;
 }
 
+function createObserver() {
+    return new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const mediaElement = entry.target;
+                if (!mediaElement.src) {
+                    mediaElement.src = mediaElement.dataset.src;
+                    mediaElement.style.opacity = '1';
+                }
+                observer.unobserve(mediaElement);
+            }
+        });
+    }, { rootMargin: '100px' });
+}
+
+const imageObserver = createObserver();
+
 const itemClasses = [
     "bento-grid-family-photo w-node-_94965c23-ae8a-8ce0-e964-880b257bc7b7-b5c26c10 w-inline-block",
     "bento-grid-family-photo w-node-ec6869a4-d13b-cd8c-e6dd-19dda5ef75a4-b5c26c10 w-inline-block",
@@ -137,7 +174,7 @@ async function appendResults(results) {
                             'Dropbox-API-Arg': JSON.stringify({
                                 path: file.path_lower,
                                 format: format,
-                                size: 'w480h320'
+                                size: 'w256h256'
                             })
                         }
                     });
@@ -160,6 +197,7 @@ async function appendResults(results) {
                         } else if (['mp4', 'mov', 'avi', 'mkv'].includes(fileExtension)) {
                             mediaElement = document.createElement('video');
                             mediaElement.controls = true;
+                            
                         }
 
                         if (mediaElement) {
@@ -167,6 +205,13 @@ async function appendResults(results) {
                             mediaElement.style.opacity = '0';  // Start fully transparent
                             mediaElement.style.transition = 'opacity 0.5s ease-in-out';
                             mediaElement.src = previewUrl;
+
+                            mediaElement.style.width = '100%';
+                            mediaElement.style.height = '100%';
+                            mediaElement.style.objectFit = 'cover';
+                            mediaElement.style.maxHeight = '200px';
+                            mediaElement.loading = 'lazy';
+                            mediaElement.style.imageRendering = 'crisp-edges';
 
                             const wrapper = document.createElement('div');
                             wrapper.className = itemClasses[currentItemIndex]; // Assign the appropriate class

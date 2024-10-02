@@ -5,6 +5,26 @@ const listFolderUrl = 'https://api.dropboxapi.com/2/files/list_folder';
 const listFolderContinueUrl = 'https://api.dropboxapi.com/2/files/list_folder/continue';
 const getTemporaryLinkUrl = 'https://api.dropboxapi.com/2/files/get_temporary_link';
 
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        // User is signed in, fetch their folder path
+        try {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+                userFolderPath = userDoc.data().folderPath;
+                console.log('User folder path:', userFolderPath);
+            } else {
+                console.error('No folder path found for user:', user.email);
+            }
+        } catch (error) {
+            console.error('Error fetching user folder path:', error);
+        }
+    } else {
+        // No user is signed in, redirect to login page.
+        window.location.href = '/';
+    }
+});
+
 const familyKeywords = ['family', 'reunion', 'birthday', 'wedding', 'anniversary', 'holiday', 'vacation', 'siblings', 'parents', 'grandparents', 'children'];
 
 async function ensureAccessToken() {
