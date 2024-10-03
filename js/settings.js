@@ -1,80 +1,262 @@
-// Import necessary modules
-import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-import { updateEmail, reauthenticateWithCredential, EmailAuthProvider, sendEmailVerification } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js"; // You need to explicitly import these
+import { auth, onAuthStateChanged, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { 
+    updateEmail, 
+    updatePassword, 
+    reauthenticateWithCredential, 
+    EmailAuthProvider, 
+    sendEmailVerification 
+} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 
-// Select the form
-const form = document.getElementById('change-email-form');
-const verifyEmailButton = document.getElementById('verify-email');
+import { doc, setDoc, getDoc, getDocs, updateDoc, collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 
-// Add event listener to the form
-form.addEventListener('submit', async (event) => {
-  // Prevent the default form submission
-  event.preventDefault();
+const emailChangeForm = document.getElementById('emailChangeForm');
+const passwordChangeForm = document.getElementById('passwordChangeForm');
+const verifyEmailButton = document.getElementById('verifyEmail');
+const modal = document.getElementById('verifyModal');
+const closeModal = document.getElementsByClassName('close')[0];
+const newFolderNameInput = document.getElementById('newFolderName');
+const updateFolderForm = document.getElementById('updateFolderForm');
+const statusElement = document.getElementById('status');
+let currentUser = null;
 
-  // Capture the new email input
-  const newEmail = document.getElementById('email').value;
-
-  // Check if the user is authenticated
-  onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, (user) => {
     if (user) {
-      try {
-        // Reauthenticate the user before performing the email update
-        const password = prompt('Please enter your password to reauthenticate');
-        const credential = EmailAuthProvider.credential(user.email, password);
-
-        // Re-authenticate the user
-        await reauthenticateWithCredential(user, credential);
-
-        // Once reauthenticated, update the email
-        await updateEmail(user, newEmail);
-
-        console.log(`Email successfully updated to ${newEmail}`);
-        alert('Email updated successfully!');
-      } catch (error) {
-        console.error('Error updating email:', error);
-        alert(`Failed to update email: ${error.message}`);
-      }
+        attachEventListeners(user);
     } else {
-      console.log('No user is signed in.');
-      alert('No user is signed in.');
+        console.log("No user is signed in.");
     }
-  });
 });
 
-// Add event listener to the verify email button
-verifyEmailButton.addEventListener('click', async () => {
-  // Check if the user is authenticated
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      try {
-        // Send the email verification
-        await sendEmailVerification(user);
-        alert('Verification email sent! Please check your inbox.');
+function attachEventListeners(user) {
+    emailChangeForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!user.emailVerified) {
+            showModal();
+            return;
+        }
+        handleEmailChange(e, user);
+    });
 
-        // Hide the verify email button after successful email verification
-        verifyEmailButton.style.display = 'none';
-      } catch (error) {
-        console.error('Error sending verification email:', error);
-        alert(`Failed to send verification email: ${error.message}`);
-      }
-    } else {
-      alert('No user is signed in to verify email.');
+    passwordChangeForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!user.emailVerified) {
+            showModal();
+            return;
+        }
+        handlePasswordChange(e, user);
+    });
+
+    verifyEmailButton.addEventListener('click', () => {
+        sendEmailVerification(user).then(() => {
+            alert('Verification email sent. Please check your inbox.');
+            hideModal();
+        }).catch((error) => {
+            alert('Error sending verification email: ' + error.message);
+        });
+    });
+
+    closeModal.onclick = hideModal;
+    window.onclick = (event) => {
+        if (event.target == modal) {
+            hideModal();
+        }
     }
-  });
+}
+
+function handleEmailChange(e, user) {
+    const formData = new FormData(e.target);
+    const newEmail = formData.get('newEmail');
+    const password = formData.get('emailPassword');
+
+    const credential = EmailAuthProvider.credential(user.email, password);
+    reauthenticateWithCredential(user, credential).then(() => {
+        updateEmail(user, newEmail).then(() => {
+            alert('Email updated successfully. Please verify your new email.');
+            e.target.reset();
+        }).catch((error) => {
+            alert('Error updating email: ' + error.message);
+        });
+    }).catch((error) => {
+        alert('Error reauthenticating: ' + error.message);
+    });
+}
+
+function handlePasswordChange(e, user) {
+    const formData = new FormData(e.target);
+    const oldPassword = formData.get('oldPassword');
+    const newPassword = formData.get('newPassword');
+
+    const credential = EmailAuthProvider.credential(user.email, oldPassword);
+    reauthenticateWithCredential(user, credential).then(() => {
+        updatePassword(user, newPassword).then(() => {
+            alert('Password updated successfully.');
+            e.target.reset();
+        }).catch((error) => {
+            alert('Error updating password: ' + error.message);
+        });
+    }).catch((error) => {
+        alert('Error reauthenticating: ' + error.message);
+    });
+}
+
+function showModal() {
+    modal.style.display = "block";
+}
+
+function hideModal() {
+    modal.style.display = "none";
+}
+
+
+
+// Function to get current user's folderPath
+
+async function getCurrentFolderPath() {
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('No user logged in');
+        }
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+            throw new Error('User document not found');
+        }
+
+        const userData = userDoc.data();
+        return userData.folderPath;
+    } catch (error) {
+        console.error('Error getting current folder path:', error);
+        statusElement.textContent = `Error: ${error.message}`;
+        return null;
+    }
+}
+
+
+// Set current folderPath as placeholder when page loads
+auth.onAuthStateChanged(async (user) => {
+    if (user) {
+        const currentFolderPath = await getCurrentFolderPath();
+        if (currentFolderPath) {
+            newFolderNameInput.placeholder = currentFolderPath.replace('/', '');
+        }
+    } else {
+        statusElement.textContent = 'Please log in to update your folder name.';
+        updateFolderForm.style.display = 'none';
+    }
+});
+
+updateFolderForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const newFolderName = newFolderNameInput.value;
+
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('No user logged in');
+        }
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+            throw new Error('User document not found');
+        }
+
+        const userData = userDoc.data();
+        const oldFolderPath = userData.folderPath;
+
+        // Update the folderPath in Firestore
+        await setDoc(userDocRef, { folderPath: `/${newFolderName}` }, { merge: true });
+
+        // Rename the folder in Dropbox
+        await dbx.filesMove({
+            from_path: oldFolderPath,
+            to_path: `/${newFolderName}`
+        });
+
+        statusElement.textContent = `Folder name updated successfully to /${newFolderName}`;
+        newFolderNameInput.placeholder = newFolderName;
+        newFolderNameInput.value = '';
+    } catch (error) {
+        console.error('Error updating folder name:', error);
+        statusElement.textContent = `Error: ${error.message}`;
+    }
 });
 
 
 
+// Admin panel
 
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        currentUser = user;
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userData = userDoc.data();
+        
+        if (userData && userData.role === "admin") {
+            document.getElementById("adminPanel").style.display = "block";
+            displayUsers(); // Call this function to show the user list for admins
+        } else {
+            document.getElementById("adminPanel").style.display = "none";
+            document.getElementById("userList").style.display = "none";
+        }
+        
+        document.getElementById("currentRole").textContent = userData.role || "unknown";
+    } else {
+        document.getElementById("adminPanel").style.display = "none";
+        document.getElementById("userList").style.display = "none";
+        document.getElementById("currentRole").textContent = "Not signed in";
+    }
+});
 
+async function changeUserRole(newRole) {
+    if (!currentUser) {
+        alert("No user is currently signed in.");
+        return;
+    }
 
+    try {
+        await updateDoc(doc(db, "users", currentUser.uid), { role: newRole });
+        alert(`Your role has been changed to ${newRole} successfully! The page will now refresh.`);
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    } catch (error) {
+        console.error("Error changing user role:", error);
+        alert("Error changing your role. Please try again.");
+    }
+}
 
+window.changeToAdmin = () => changeUserRole("admin");
+window.changeToUser = () => changeUserRole("user");
 
+async function displayUsers() {
+    const userListDiv = document.getElementById("userList");
+    userListDiv.innerHTML = "<h3>User List</h3>";
+    userListDiv.style.display = "block";
 
-
-
-
-
+    try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        querySnapshot.forEach((doc) => {
+            const userData = doc.data();
+            const userElement = document.createElement("div");
+            userElement.innerHTML = `
+                <p><strong>Name:</strong> ${userData.name || 'N/A'}</p>
+                <p><strong>Email:</strong> ${userData.email || 'N/A'}</p>
+                <p><strong>Role:</strong> ${userData.role || 'N/A'}</p>
+                <hr>
+            `;
+            userListDiv.appendChild(userElement);
+        });
+    } catch (error) {
+        console.error("Error fetching users:", error);
+        userListDiv.innerHTML += "<p>Error fetching users. Please try again later.</p>";
+    }
+}
 
 
 

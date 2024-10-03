@@ -104,35 +104,36 @@
           <div class="svg-icon w-embed"><svg xmlns="http://www.w3.org/2000/svg" height="auto" viewbox="0 0 48 48" width="200px" fill="currentColor">
               <path d="M22.95 44.95 18 40H9q-1.2 0-2.1-.925Q6 38.15 6 37V7q0-1.2.9-2.1Q7.8 4 9 4h30q1.15 0 2.075.9Q42 5.8 42 7v30q0 1.15-.925 2.075Q40.15 40 39 40h-9l-4.95 4.95q-.45.45-1.05.45-.6 0-1.05-.45Zm.9-11.85q.8 0 1.35-.55t.55-1.35q0-.8-.55-1.35t-1.35-.55q-.8 0-1.35.55t-.55 1.35q0 .8.55 1.35t1.35.55Zm1.3-8.95q.15-.75.675-1.525.525-.775 1.525-1.775 1.6-1.6 2.25-2.875.65-1.275.65-2.825 0-2.6-1.625-4.075T24.25 9.6q-2.25 0-4.175.95-1.925.95-2.475 2.35-.25.55-.1 1.075.15.525.7.775.55.25 1.125-.025T20.35 14q.75-.75 1.675-1.15.925-.4 2.025-.4 1.5 0 2.425.775.925.775.925 2.125 0 1-.55 1.95t-1.8 2.1q-1.4 1.35-2.125 2.575Q22.2 23.2 22.2 24.2q0 .6.4 1.05.4.45.95.45.6 0 1.025-.45.425-.45.575-1.1Z"></path>
             </svg></div>
-          <div>Support</div>
+          <div>Admin</div>
         </a>
       </div>
       <div class="_100 w-tab-content">
         <div data-w-tab="Profile" class="w-tab-pane w--tab-active">
+          <div class="profile_form-header">
+            <div>
+              <div class="profile-h1">Profile information</div>
+            </div>
+          </div>
           <div class="no-margin w-form">
-            <form id="wf-form-Profile-Form" name="wf-form-Profile-Form" data-name="Profile Form" method="get" data-ms-form="profile" class="profile-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af0cc">
-              <div class="profile_form-header">
-                <div>
-                  <div class="profile-h1">Profile information</div>
-                </div><input id="save-profile-button" type="submit" data-wait="Please wait..." class="button-2 auto w-button" value="Save Profile">
-              </div>
-              <div class="profile-row"><label for="name" class="profile-label">Your Name</label>
-                <div class="profile-input-wrapper">
-                  <div class="freebie-link"><input class="input w-input" maxlength="256" name="First-Name-6" data-name="First Name 6" placeholder="e.g. Howard" type="text" id="name" data-ms-member="first-name" required=""></div>
-                </div>
-              </div>
-              <div class="profile-row"><label for="name" class="profile-label">Phone<br></label>
-                <div class="profile-input-wrapper"><input class="input w-input" maxlength="256" name="Phone-2" data-name="Phone 2" placeholder="e.g. 333-333-4444" type="text" id="Phone-2" data-ms-member="phone">
-                  <div><span class="profile_label-sub">We&#x27;ll only call you in an emergency</span></div>
-                </div>
-              </div>
+            <h1>Update Folder Name</h1>
+            <form id="updateFolderForm">
+                <label for="newFolderName">New Folder Name:</label>
+                <input placeholder="e.g. Howard" type="text" class="input w-input" id="newFolderName" required>
+                <button type="submit">Update</button>
             </form>
-            <div class="w-form-done">
-              <div>Thank you! Your submission has been received!</div>
-            </div>
-            <div class="w-form-fail">
-              <div>Oops! Something went wrong while submitting the form.</div>
-            </div>
+
+            <p id="status"></p>
+
+
+
+
+
+
+
+
+
+
+
           </div>
           <div class="profile-row">
             <div class="profile-label">Other</div>
@@ -168,15 +169,27 @@
             </div>
           </div>
         </div>
+        <div id="verifyModal" class="modal">
+          <div class="modal-content">
+              <span class="close">&times;</span>
+              <p>Please verify your email before changing it.</p>
+              <button id="verifyEmail">Verify Email</button>
+          </div>
+        </div>
         <div data-w-tab="Email" class="w-tab-pane">
           <div class="no-margin w-form">
-            <form id="change-email-form">
-              <label for="email">New Email:</label>
-              <input type="email" id="email" name="email" required>
-              <button type="submit">Change Email</button>
+            <h1>Change Email</h1>
+            <form id="emailChangeForm">
+                <label for="newEmail">New Email:</label>
+                <input type="email" id="newEmail" name="newEmail" required>
+                <br>
+                <label for="emailPassword">Password:</label>
+                <input type="password" id="emailPassword" name="emailPassword" required>
+                <br>
+                <button type="submit">Change Email</button>
             </form>
-            <button id="verify-email">Verify Email</button>
-
+            
+            
 
 
             <!-- <form id="wf-form-Email-Form-2" name="wf-form-Email-Form-2" data-name="Email Form" method="get" data-ms-form="email" class="memberstack-form" data-wf-page-id="66f60c65bf4d944dfb213de8" data-wf-element-id="0a60ce9a-f47a-0c90-d2ea-a86db33af11c">
@@ -191,70 +204,63 @@
                 </div>
               </div>
             </form> -->
-            <div class="w-form-done">
-              <div>Thank you! Your submission has been received!</div>
-            </div>
-            <div class="w-form-fail">
-              <div>Oops! Something went wrong while submitting the form.</div>
-            </div>
           </div>
         </div>
         <div data-w-tab="Password" class="w-tab-pane">
           <div class="no-margin w-form">
-            
-            <form id="change-password-form">
-              <label for="current-password">Current Password:</label>
-              <input type="password" id="current-password" name="current-password" required>
-              
-              <label for="new-password">New Password:</label>
-              <input type="password" id="new-password" name="new-password" required>
-              
-              <button type="submit">Change Password</button>
+            <h1>Change Password</h1>
+            <form id="passwordChangeForm">
+                <label for="oldPassword">Old Password:</label>
+                <input type="password" id="oldPassword" name="oldPassword" required>
+                <br>
+                <label for="newPassword">New Password:</label>
+                <input type="password" id="newPassword" name="newPassword" required>
+                <br>
+                <button type="submit">Change Password</button>
             </form>
 
-            <div class="w-form-done">
-              <div>Thank you! Your submission has been received!</div>
-            </div>
-            <div class="w-form-fail">
-              <div>Oops! Something went wrong while submitting the form.</div>
-            </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
           </div>
         </div>
         <div data-w-tab="Checklist" class="w-tab-pane">
           <div class="no-margin w-form">
-            <form id="wf-form-Password-Form" name="wf-form-Password-Form" data-name="Password Form" method="post" action="javascript:void(0)" data-ms-form="new-password-form" class="memberstack-form" data-form-type="password">
-              <div class="profile_form-header">
-                <div>
-                  <div class="profile-h1">Change your password</div>
-                </div>
-                <input id="update-password-button" type="submit" data-wait="Please wait..." class="button-2 auto w-button" value="Update Password">
-              </div>
-              <div class="profile-row">
-                <label for="current-password" class="profile-label">Current Password</label>
-                <div class="profile-input-wrapper">
-                  <input class="input w-input" maxlength="256" name="current-password" data-name="Current Password" placeholder="" type="password" id="current-password" required="">
-                </div>
-              </div>
-              <div class="profile-row no-line">
-                <label for="new-password" class="profile-label">New Password</label>
-                <div class="profile-input-wrapper">
-                  <input class="input w-input" maxlength="256" name="new-password" data-name="New Password" placeholder="" type="password" id="new-password" required="">
-                  <div><span class="profile_label-sub">Minimum 8-characters.</span></div>
-                </div>
-              </div>
-              <div id="change-password-message"></div>
-            </form>
+            <div id="adminPanel" style="display: none;">
+              <h2>User Role Management</h2>
+              <input type="text" id="userIdInput" placeholder="Enter User ID">
+              <button onclick="changeToAdmin()">Change to Admin</button>
+              <button onclick="changeToUser()">Change to User</button>
+            </div>
+            <div id="userList" style="display: none;"></div>
+
+
+
+
+
+
+
             <div class="recently-uploaded">
               <div class="recently-uploaded-desc">
                 <h1 class="heading-3">Recently Uploaded</h1>
               </div>
               <div id="recent-uploaded-grid" class="recently-uploaded-contents"></div>
-            </div>
-            <div class="w-form-done">
-              <div>Thank you! Your submission has been received!</div>
-            </div>
-            <div class="w-form-fail">
-              <div>Oops! Something went wrong while submitting the form.</div>
             </div>
           </div>
         </div>
