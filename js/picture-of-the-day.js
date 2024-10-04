@@ -1,7 +1,17 @@
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
+import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+onAuthStateChanged(auth, (user) => {
+    if (!user) {
+        // No user is signed in, redirect to the sign-in page.
+        window.location.href = '/sign-in.html';
+    }
+    // If a user is signed in, do nothing and allow access to the current page.
+});
 
 const CACHE_KEY = 'dropboxImageCache';
 const ONE_DAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+
 
 async function fetchRandomImage() {
     await refreshDropboxAccessToken();
