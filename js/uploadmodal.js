@@ -8,6 +8,7 @@ const gallery = document.getElementById('gallery');
 const folderSelects = document.getElementById('folderSelects');
 const uploadToDropboxBtn = document.getElementById('uploadToDropbox');
 const fileElem = document.getElementById('fileElem');
+const createFolderBtn = document.getElementById('createFolderBtn'); // New button
 
 let files = [];
 
@@ -102,7 +103,7 @@ async function createFolderSelect(path, level) {
         alert('Failed to load folders. Please try again.');
         return;
     }
-    
+
     options.unshift({ path_lower: path, name: '(This folder)' });
     options.forEach(option => {
         const optElement = document.createElement('option');
@@ -205,6 +206,57 @@ async function uploadFileToDropbox(file, path) {
         throw error;
     }
 }
+
+// New function to handle creating a folder
+async function handleCreateFolder() {
+    const folderName = prompt('Enter new folder name:');
+    if (!folderName) {
+        return; // User cancelled or didn't enter a name
+    }
+
+    const selectedPath = getSelectedPath();
+    const newFolderPath = selectedPath === '' ? `/${folderName}` : `${selectedPath}/${folderName}`;
+
+    try {
+        await refreshDropboxAccessToken();
+        await createFolderInDropbox(newFolderPath);
+        alert('Folder created successfully!');
+        // Refresh the folder selects to include the new folder
+        await updateFolderSelects();
+    } catch (error) {
+        console.error('Error creating folder:', error);
+        alert('Failed to create folder. Please try again.');
+    }
+}
+
+// New function to create a folder in Dropbox
+async function createFolderInDropbox(path) {
+    try {
+        const response = await fetch('https://api.dropboxapi.com/2/files/create_folder_v2', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                path: path,
+                autorename: false
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw { status: response.status, message: errorData.error_summary };
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error in createFolderInDropbox:', error);
+        throw error;
+    }
+}
+
+createFolderBtn.addEventListener('click', handleCreateFolder); // Event listener for the new button
 
 // Initial call to set up the first folder select
 updateFolderSelects();

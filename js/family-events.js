@@ -3,16 +3,17 @@ import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family
 
 // Function to get URL parameters
 function getUrlParameter(name) {
-    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+    name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    var results = regex.exec(location.search);
+    var results = regex.exec(window.location.search);
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
 const year = getUrlParameter('year');
 
-// Modified getThumbnailBlob to accept size parameter and implement caching
-async function getThumbnailBlob(path, size) {
+// Modified getThumbnailBlob to always use 'w64h64' and implement caching
+async function getThumbnailBlob(path) {
+    const size = 'w64h64'; // Enforce 64x64 resolution
     const cacheKey = `${path}_${size}`;
     const cache = await caches.open('thumbnails-cache');
 
@@ -31,7 +32,7 @@ async function getThumbnailBlob(path, size) {
                 'Dropbox-API-Arg': JSON.stringify({
                     path: path,
                     format: 'jpeg',
-                    size: size // Use the size parameter
+                    size: size // Always use 'w64h64'
                 })
             }
         });
@@ -51,26 +52,19 @@ async function getThumbnailBlob(path, size) {
     }
 }
 
-// Function to create object URLs for the thumbnails
-async function getThumbnails(path) {
-    // Define the sizes you want to fetch
-    const sizes = ['w256h256', 'w640h480', 'w1024h768'];
-    const thumbnails = {};
-
-    for (const size of sizes) {
-        const blob = await getThumbnailBlob(path, size);
-        if (blob) {
-            const url = URL.createObjectURL(blob);
-            thumbnails[size] = url;
-        } else {
-            console.error(`Failed to fetch thumbnail of size ${size} for path ${path}`);
-        }
+// Function to create object URL for the thumbnail
+async function getThumbnail(path) {
+    const blob = await getThumbnailBlob(path);
+    if (blob) {
+        const url = URL.createObjectURL(blob);
+        return url;
+    } else {
+        console.error(`Failed to fetch thumbnail for path ${path}`);
+        return null;
     }
-
-    return thumbnails;
 }
 
-// Function to get the most recent image from a folder and its thumbnails
+// Function to get the most recent image from a folder and its thumbnail
 async function getMostRecentImageFromFolder(folderPath) {
     try {
         const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
@@ -82,7 +76,7 @@ async function getMostRecentImageFromFolder(folderPath) {
             body: JSON.stringify({
                 path: folderPath,
                 recursive: false,
-                include_media_info: false,
+                include_media_info: true, // Enable media info
                 include_deleted: false,
                 include_has_explicit_shared_members: false,
                 include_mounted_folders: false,
@@ -95,8 +89,16 @@ async function getMostRecentImageFromFolder(folderPath) {
         }
 
         const data = await response.json();
-        const imageFiles = data.entries.filter(entry => entry['.tag'] === 'file' && entry.name.match(/\.(jpg|jpeg|png|gif)$/i));
-        
+
+        // Filter files that are images based on media_info or file extensions
+        const imageFiles = data.entries.filter(entry =>
+            entry['.tag'] === 'file' &&
+            (
+                (entry.media_info && entry.media_info['.tag'] === 'photo') ||
+                /\.(jpg|jpeg|png|gif|heic)$/i.test(entry.name)
+            )
+        );
+
         if (imageFiles.length === 0) return null;
 
         // Sort by client_modified date if available, otherwise use server_modified
@@ -108,11 +110,11 @@ async function getMostRecentImageFromFolder(folderPath) {
 
         const mostRecentImage = imageFiles[0];
 
-        // Get thumbnails of different sizes
-        const thumbnails = await getThumbnails(mostRecentImage.path_lower);
+        // Get the thumbnail
+        const thumbnailUrl = await getThumbnail(mostRecentImage.path_lower);
 
         return {
-            thumbnails: thumbnails,
+            thumbnail: thumbnailUrl,
             imagePath: mostRecentImage.path_lower
         };
     } catch (error) {
@@ -157,9 +159,9 @@ async function listExactYearFolders() {
         }
 
         const data = await response.json();
-        
-        const exactMatches = data.matches.filter(match => 
-            match.metadata.metadata['.tag'] === 'folder' && 
+
+        const exactMatches = data.matches.filter(match =>
+            match.metadata.metadata['.tag'] === 'folder' &&
             match.metadata.metadata.name === year
         );
 
@@ -172,7 +174,7 @@ async function listExactYearFolders() {
         if (exactMatches.length > 0) {
             for (const match of exactMatches) {
                 const folderPath = match.metadata.metadata.path_lower;
-                const folderContents = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+                const folderContentsResponse = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -187,12 +189,18 @@ async function listExactYearFolders() {
                         include_mounted_folders: false,
                         limit: 2000
                     })
-                }).then(res => res.json());
+                });
+
+                if (!folderContentsResponse.ok) {
+                    throw new Error(`HTTP error! status: ${folderContentsResponse.status}`);
+                }
+
+                const folderContents = await folderContentsResponse.json();
 
                 for (const item of folderContents.entries) {
                     if (item['.tag'] === 'folder') {
                         const imageData = await getMostRecentImageFromFolder(item.path_lower);
-                        if (imageData && imageData.thumbnails) {
+                        if (imageData && imageData.thumbnail) {
                             // Create an 'a' element
                             const folderLink = document.createElement('a');
                             folderLink.className = 'folder-item';
@@ -202,25 +210,19 @@ async function listExactYearFolders() {
                             const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedPath}`;
                             folderLink.href = href;
 
-                            // Create an img element with responsive images
+                            // Create an img element
                             const img = document.createElement('img');
                             img.alt = item.name;
                             img.loading = 'lazy'; // Implement lazy loading
 
-                            // Set the styles as per your requirements
-                            img.style.maxHeight = '100px';
+                            // Set the styles to enforce 64x64 resolution
                             img.style.width = '100%';
+                            img.style.height = '100px';
                             img.style.objectFit = 'cover';
                             img.style.borderRadius = '4px';
 
-                            // Construct srcset and sizes attributes
-                            img.src = imageData.thumbnails['w256h256']; // Fallback image
-                            img.srcset = `
-                                ${imageData.thumbnails['w256h256']} 256w,
-                                ${imageData.thumbnails['w640h480']} 640w,
-                                ${imageData.thumbnails['w1024h768']} 1024w
-                            `;
-                            img.sizes = '(max-width: 600px) 256px, (max-width: 1200px) 640px, 1024px';
+                            // Set the src attribute
+                            img.src = imageData.thumbnail;
 
                             // Append the image to the folder link
                             folderLink.appendChild(img);
@@ -249,15 +251,14 @@ async function listExactYearFolders() {
     } catch (error) {
         console.error('Error searching Dropbox folders:', error);
         console.error('Error details:', error.message);
-        
+
         const errorDiv = document.createElement('div');
         errorDiv.textContent = `Error: ${error.message}`;
-        document.getElementById('event-bento-grid').appendChild(errorDiv);
+        const eventBentoGrid = document.getElementById('event-bento-grid');
+        if (eventBentoGrid) {
+            eventBentoGrid.appendChild(errorDiv);
+        }
     }
 }
 
 listExactYearFolders();
-
-
-
-

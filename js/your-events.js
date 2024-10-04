@@ -17,9 +17,9 @@ function getUrlParameter(name) {
 
 const year = getUrlParameter('year');
 
-// Modified getThumbnailBlob to accept size parameter and implement caching
-async function getThumbnailBlob(path, size) {
-    const cacheKey = `${path}_${size}`;
+// Modified getThumbnailBlob to always use 'w64h64' resolution
+async function getThumbnailBlob(path) {
+    const cacheKey = `${path}`;
     const cache = await caches.open('thumbnails-cache');
 
     // Check if the image is already in the cache
@@ -37,7 +37,7 @@ async function getThumbnailBlob(path, size) {
                 'Dropbox-API-Arg': JSON.stringify({
                     path: path,
                     format: 'jpeg',
-                    size: size // Use the size parameter
+                    size: 'w64h64' // Always use 'w64h64'
                 })
             }
         });
@@ -57,26 +57,19 @@ async function getThumbnailBlob(path, size) {
     }
 }
 
-// Function to create object URLs for the thumbnails
-async function getThumbnails(path) {
-    // Define the sizes you want to fetch
-    const sizes = ['w256h256', 'w640h480', 'w1024h768'];
-    const thumbnails = {};
-
-    for (const size of sizes) {
-        const blob = await getThumbnailBlob(path, size);
-        if (blob) {
-            const url = URL.createObjectURL(blob);
-            thumbnails[size] = url;
-        } else {
-            console.error(`Failed to fetch thumbnail of size ${size} for path ${path}`);
-        }
+// Function to create an object URL for the thumbnail
+async function getThumbnail(path) {
+    const blob = await getThumbnailBlob(path);
+    if (blob) {
+        const url = URL.createObjectURL(blob);
+        return url;
+    } else {
+        console.error(`Failed to fetch thumbnail for path ${path}`);
+        return null;
     }
-
-    return thumbnails;
 }
 
-// Function to get the most recent image from a folder and its thumbnails
+// Function to get the most recent image from a folder and its thumbnail
 async function getMostRecentImageFromFolder(folderPath) {
     try {
         const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
@@ -114,11 +107,11 @@ async function getMostRecentImageFromFolder(folderPath) {
 
         const mostRecentImage = imageFiles[0];
 
-        // Get thumbnails of different sizes
-        const thumbnails = await getThumbnails(mostRecentImage.path_lower);
+        // Get the thumbnail
+        const thumbnailUrl = await getThumbnail(mostRecentImage.path_lower);
 
         return {
-            thumbnails: thumbnails,
+            thumbnailUrl: thumbnailUrl,
             imagePath: mostRecentImage.path_lower
         };
     } catch (error) {
@@ -179,7 +172,7 @@ async function listExactYearFolders(folderPath) {
 
         if (yearFolderMatches.length === 0) {
             console.error(`No '${year}' folder found within '${folderPath}'.`);
-            const eventBentoGrid = document.getElementById('event-bento-grid');
+            const eventBentoGrid = document.getElementById('event-bento-grid2');
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No '${year}' folder found within '${folderPath}'.`;
             eventBentoGrid.appendChild(noResultsDiv);
@@ -217,9 +210,9 @@ async function listExactYearFolders(folderPath) {
         const data = await response.json();
         const entries = data.entries;
 
-        const eventBentoGrid = document.getElementById('event-bento-grid');
+        const eventBentoGrid = document.getElementById('event-bento-grid2');
         if (!eventBentoGrid) {
-            console.error('Element with id "event-bento-grid" not found');
+            console.error('Element with id "event-bento-grid2" not found');
             return;
         }
 
@@ -227,7 +220,7 @@ async function listExactYearFolders(folderPath) {
             for (const item of entries) {
                 if (item['.tag'] === 'folder') {
                     const imageData = await getMostRecentImageFromFolder(item.path_lower);
-                    if (imageData && imageData.thumbnails) {
+                    if (imageData && imageData.thumbnailUrl) {
                         // Create an 'a' element
                         const folderLink = document.createElement('a');
                         folderLink.className = 'folder-item';
@@ -237,25 +230,19 @@ async function listExactYearFolders(folderPath) {
                         const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedPath}`;
                         folderLink.href = href;
 
-                        // Create an img element with responsive images
+                        // Create an img element
                         const img = document.createElement('img');
                         img.alt = item.name;
                         img.loading = 'lazy'; // Implement lazy loading
 
-                        // Set the styles as per your requirements
-                        img.style.maxHeight = '100px';
+                        // Set the styles to enforce 64x64 resolution
                         img.style.width = '100%';
+                        img.style.height = '100px';
                         img.style.objectFit = 'cover';
                         img.style.borderRadius = '4px';
 
-                        // Construct srcset and sizes attributes
-                        img.src = imageData.thumbnails['w256h256']; // Fallback image
-                        img.srcset = `
-                            ${imageData.thumbnails['w256h256']} 256w,
-                            ${imageData.thumbnails['w640h480']} 640w,
-                            ${imageData.thumbnails['w1024h768']} 1024w
-                        `;
-                        img.sizes = '(max-width: 600px) 256px, (max-width: 1200px) 640px, 1024px';
+                        // Set the src to the thumbnail URL
+                        img.src = imageData.thumbnailUrl;
 
                         // Append the image to the folder link
                         folderLink.appendChild(img);
@@ -286,7 +273,7 @@ async function listExactYearFolders(folderPath) {
 
         const errorDiv = document.createElement('div');
         errorDiv.textContent = `Error: ${error.message}`;
-        document.getElementById('event-bento-grid').appendChild(errorDiv);
+        document.getElementById('event-bento-grid2').appendChild(errorDiv);
     }
 }
 
