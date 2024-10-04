@@ -18,6 +18,10 @@ const closeModal = document.getElementsByClassName('close')[0];
 const newFolderNameInput = document.getElementById('newFolderName');
 const updateFolderForm = document.getElementById('updateFolderForm');
 const statusElement = document.getElementById('status');
+const deleteAccountButton = document.getElementById('delete-account');
+const deleteAccountModal = document.getElementById('deleteAccountModal');
+const confirmDeleteAccount = document.getElementById('confirmDeleteAccount');
+const cancelDeleteAccount = document.getElementById('cancelDeleteAccount');
 let currentUser = null;
 
 onAuthStateChanged(auth, (user) => {
@@ -36,6 +40,20 @@ function attachEventListeners(user) {
             return;
         }
         handleEmailChange(e, user);
+    });
+
+    deleteAccountButton.addEventListener('click', () => {
+        deleteAccountModal.style.display = "block";
+    });
+
+    confirmDeleteAccount.addEventListener('click', () => handleDeleteAccount(user));
+    cancelDeleteAccount.addEventListener('click', () => deleteAccountModal.style.display = "none");
+
+    // Close the modal when clicking outside of it
+    window.addEventListener('click', (event) => {
+        if (event.target == deleteAccountModal) {
+            deleteAccountModal.style.display = "none";
+        }
     });
 
     passwordChangeForm.addEventListener('submit', (e) => {
@@ -108,7 +126,35 @@ function hideModal() {
     modal.style.display = "none";
 }
 
+function setupDeleteAccountButton(user) {
+    if (deleteAccountButton) {
+        deleteAccountButton.style.display = "block";
+    }
+}
 
+async function handleDeleteAccount(user) {
+    try {
+        // Get the user's folder path
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        const folderPath = userDoc.data().folderPath;
+
+        // Delete the user's folder in Dropbox
+        await dbx.filesDeleteV2({ path: folderPath });
+
+        // Delete the user's account using the custom Firebase function
+        await deleteAccount({ userId: user.uid });
+
+        // Sign out the user
+        await auth.signOut();
+
+        // Redirect to the home page
+        window.location.href = '/';
+    } catch (error) {
+        console.error("Error deleting account:", error);
+        alert("Error deleting account. Please try again.");
+    }
+}
 
 // Function to get current user's folderPath
 
@@ -248,6 +294,7 @@ async function displayUsers() {
                 <p><strong>Name:</strong> ${userData.name || 'N/A'}</p>
                 <p><strong>Email:</strong> ${userData.email || 'N/A'}</p>
                 <p><strong>Role:</strong> ${userData.role || 'N/A'}</p>
+                <button onclick="openDeleteModal('${doc.id}', '${userData.email}')">Remove User</button>
                 <hr>
             `;
             userListDiv.appendChild(userElement);
@@ -255,6 +302,31 @@ async function displayUsers() {
     } catch (error) {
         console.error("Error fetching users:", error);
         userListDiv.innerHTML += "<p>Error fetching users. Please try again later.</p>";
+    }
+}
+
+window.openDeleteModal = (userId, userEmail) => {
+    const modal = document.getElementById("deleteModal");
+    const userInfoSpan = document.getElementById("deleteUserInfo");
+    userInfoSpan.textContent = userEmail;
+    modal.style.display = "block";
+    window.userToDelete = userId;
+}
+
+window.closeModal = () => {
+    const modal = document.getElementById("deleteModal");
+    modal.style.display = "none";
+}
+
+window.confirmDelete = async () => {
+    try {
+        await deleteAccount({ userId: window.userToDelete });
+        alert("User account deleted successfully.");
+        closeModal();
+        displayUsers(); // Refresh the user list
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Error deleting user account. Please try again.");
     }
 }
 

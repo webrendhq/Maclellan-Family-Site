@@ -12,10 +12,10 @@ function handleSignOut() {
     });
 }
 
-// Add event listener for sign-out button
+// Add event listeners for sign-out buttons
 document.addEventListener('DOMContentLoaded', () => {
-    const signOutButton = document.getElementById('signout');
-    if (signOutButton) {
-        signOutButton.addEventListener('click', handleSignOut);
-    }
+    const signOutButtons = document.querySelectorAll('#signout, #signout-settings');
+    signOutButtons.forEach(button => {
+        button.addEventListener('click', handleSignOut);
+    });
 });

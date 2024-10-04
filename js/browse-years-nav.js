@@ -1,5 +1,6 @@
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
-import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { auth, onAuthStateChanged, app } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
 
 const DROPBOX_API_URL = 'https://api.dropboxapi.com/2/files/list_folder';
 
@@ -77,13 +78,29 @@ async function main() {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             try {
-                const yearFolders = await findYearFolders();
-                yearFolders.forEach(year => {
-                    addYearLink(year, 'family-years');
-                    addYearLink(year, 'your-years');
-                });
+                const db = getFirestore(app); // Initialize Firestore with app
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userData = userDocSnap.data();
+                    const folderPath = userData.folderPath || '';
+                    
+                    // Find year folders under folderPath for 'your-years'
+                    const yourYearFolders = await findYearFolders(folderPath);
+                    yourYearFolders.forEach(year => {
+                        addYearLink(year, 'your-years');
+                    });
+                    
+                    // Also find year folders under root for 'family-years'
+                    const familyYearFolders = await findYearFolders('');
+                    familyYearFolders.forEach(year => {
+                        addYearLink(year, 'family-years');
+                    });
+                } else {
+                    console.log('No such document!');
+                }
             } catch (error) {
-                console.error('Error fetching year folders:', error);
+                console.error('Error fetching data:', error);
             }
         } else {
             console.log('User not signed in');

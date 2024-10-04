@@ -1,257 +1,263 @@
+// Import necessary functions and tokens
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
-import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
-const DROPBOX_API_URL = 'https://api.dropboxapi.com/2/files/list_folder';
-const DROPBOX_GET_TEMPORARY_LINK_URL = 'https://api.dropboxapi.com/2/files/get_temporary_link';
-const EVENTS_PER_PAGE = 5;
-
-let allEvents = [];
-let currentIndex = 0;
-
-async function listFolder(path) {
-  const response = await fetch(DROPBOX_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ path })
-  });
-  return response.json();
+// Function to get URL parameters
+function getUrlParameter(name) {
+    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    var results = regex.exec(location.search);
+    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
-function isYearFolder(name) {
-  return /^\d{4}$/.test(name);
-}
+const year = getUrlParameter('year');
 
-async function getTemporaryLink(path) {
-    await refreshDropboxAccessToken();
-    const response = await fetch(DROPBOX_GET_TEMPORARY_LINK_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ path })
-    });
-    return response.json();
-}
+// Modified getThumbnailBlob to accept size parameter and implement caching
+async function getThumbnailBlob(path, size) {
+    const cacheKey = `${path}_${size}`;
+    const cache = await caches.open('thumbnails-cache');
 
-function isImageFile(name) {
-    return /\.(jpg|jpeg|png|gif)$/i.test(name);
-}
-
-async function findYearFolder(year, path = '') {
-  const result = await listFolder(path);
-  for (const entry of result.entries) {
-    if (entry['.tag'] === 'folder') {
-      if (entry.name === year) {
-        return entry.path_lower;
-      }
-      if (!isYearFolder(entry.name)) {
-        const nestedResult = await findYearFolder(year, entry.path_lower);
-        if (nestedResult) {
-          return nestedResult;
-        }
-      }
+    // Check if the image is already in the cache
+    const cachedResponse = await cache.match(cacheKey);
+    if (cachedResponse) {
+        return await cachedResponse.blob();
     }
-  }
-  return null;
-}
 
-async function findEventFolders(yearPath) {
-  const result = await listFolder(yearPath);
-  return result.entries
-    .filter(entry => entry['.tag'] === 'folder')
-    .map(entry => ({
-      name: entry.name,
-      path: entry.path_lower,
-      year: yearPath.split('/').pop()
-    }));
-}
-
-function addEventLink(event) {
-  const grid = document.getElementById('event-bento-grid');
-  if (!grid) {
-    console.error('Events grid element not found');
-    return;
-  }
-
-  if (!document.getElementById(event.name)) {
-    const link = document.createElement('a');
-    link.id = event.name;
-    link.textContent = `${event.year} - ${event.name}`;
-    link.href = `/family-pictures.html?year=${event.year}&event=${encodeURIComponent(event.name)}`;
-    link.setAttribute('data-year', event.year);
-    link.setAttribute('data-path', event.path);
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      window.events = allEvents;
-      window.location.href = link.href;
-    });
-    grid.appendChild(link);
-  }
-}
-
-async function getRandomImageFromFolder(year, path = '') {
+    // If not in cache, fetch the image
     try {
-      const result = await listFolder(path);
-      
-      if (!result || !result.entries) {
-        console.error('Unexpected response from listFolder:', result);
+        const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Dropbox-API-Arg': JSON.stringify({
+                    path: path,
+                    format: 'jpeg',
+                    size: size // Use the size parameter
+                })
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Clone the response so we can store it in the cache
+        const responseClone = response.clone();
+        cache.put(cacheKey, responseClone);
+
+        return await response.blob();
+    } catch (error) {
+        console.error('Error fetching thumbnail:', error);
         return null;
-      }
-      
-      const folders = result.entries.filter(entry => entry['.tag'] === 'folder');
-      const imageFiles = result.entries.filter(entry => 
-        entry['.tag'] === 'file' && 
-        isImageFile(entry.name) && 
-        isRelevantImage(entry.name, year)
-      );
-      
-      if (imageFiles.length > 0) {
-        const randomImage = imageFiles[Math.floor(Math.random() * imageFiles.length)];
-        const linkResult = await getTemporaryLink(randomImage.path_lower);
-        
-        if (!linkResult || !linkResult.link) {
-          console.error('Failed to get temporary link:', linkResult);
-          return null;
-        }
-        
-        return linkResult.link;
-      }
-      
-      // If no suitable images in this folder, search through subfolders
-      for (const folder of folders) {
-        const imageLink = await getRandomImageFromFolder(year, folder.path_lower);
-        if (imageLink) {
-          return imageLink;
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error(`Error in getRandomImageFromFolder for ${path}:`, error);
-      return null;
     }
 }
 
-function isRelevantImage(filename, year) {
-  const lowerFilename = filename.toLowerCase();
-  const keywords = [
-    'family', 'occasion', 'birthday', 'wedding', 'anniversary', 'holiday', 
-    'vacation', 'christmas', 'thanksgiving', 'easter', 'graduation', 
-    'reunion', 'party', 'celebration', year
-  ];
-  return keywords.some(keyword => lowerFilename.includes(keyword));
+// Function to create object URLs for the thumbnails
+async function getThumbnails(path) {
+    // Define the sizes you want to fetch
+    const sizes = ['w256h256', 'w640h480', 'w1024h768'];
+    const thumbnails = {};
+
+    for (const size of sizes) {
+        const blob = await getThumbnailBlob(path, size);
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            thumbnails[size] = url;
+        } else {
+            console.error(`Failed to fetch thumbnail of size ${size} for path ${path}`);
+        }
+    }
+
+    return thumbnails;
 }
 
-async function addYearLink(year) {
-  const grid = document.getElementById('browse-years-grid');
-  if (!grid) {
-    console.error('Grid element not found');
-    return;
-  }
+// Function to get the most recent image from a folder and its thumbnails
+async function getMostRecentImageFromFolder(folderPath) {
+    try {
+        const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                path: folderPath,
+                recursive: false,
+                include_media_info: false,
+                include_deleted: false,
+                include_has_explicit_shared_members: false,
+                include_mounted_folders: false,
+                limit: 2000
+            })
+        });
 
-  if (!document.getElementById(year)) {
-    const link = document.createElement('a');
-    link.id = year;
-    link.textContent = year;
-    link.href = `/family-events.html?year=${year}`;
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      window.year = year;
-      window.location.href = link.href;
-    });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const imageFiles = data.entries.filter(entry => entry['.tag'] === 'file' && entry.name.match(/\.(jpg|jpeg|png|gif)$/i));
+        
+        if (imageFiles.length === 0) return null;
+
+        // Sort by client_modified date if available, otherwise use server_modified
+        imageFiles.sort((a, b) => {
+            const dateA = new Date(a.client_modified || a.server_modified);
+            const dateB = new Date(b.client_modified || b.server_modified);
+            return dateB - dateA; // Most recent first
+        });
+
+        const mostRecentImage = imageFiles[0];
+
+        // Get thumbnails of different sizes
+        const thumbnails = await getThumbnails(mostRecentImage.path_lower);
+
+        return {
+            thumbnails: thumbnails,
+            imagePath: mostRecentImage.path_lower
+        };
+    } catch (error) {
+        console.error('Error getting most recent image:', error);
+        return null;
+    }
+}
+
+// Main function to list folders and display images
+async function listExactYearFolders() {
+    if (!year) {
+        console.error('No year specified in URL parameters. Use ?year=YYYY in the URL.');
+        return;
+    }
 
     try {
-      const yearPath = await findYearFolder(year);
-      const randomImageUrl = await getRandomImageFromFolder(year, yearPath);
-      
-      if (randomImageUrl) {
-        link.style.backgroundImage = `url(${randomImageUrl})`;
-        link.style.backgroundSize = 'cover';
-        link.style.backgroundPosition = 'center';
-      } else {
-        console.log(`No image found for year ${year}, using default styling`);
-        link.style.backgroundColor = '#cccccc'; // Example default color
-      }
+        await refreshDropboxAccessToken();
+        console.log(`Searching for folders named exactly '${year}'...`);
 
-      link.style.color = 'white'; // Ensure text is visible on the image or default background
-      link.style.textShadow = '2px 2px 4px rgba(0,0,0,0.7)'; // Add shadow for better readability
-    } catch (error) {
-      console.error(`Error setting background for year ${year}:`, error);
-      link.style.backgroundColor = '#cccccc'; // Example default color
-    }
+        const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: year,
+                options: {
+                    path: "",
+                    max_results: 1000,
+                    file_status: "active",
+                    filename_only: true
+                },
+                match_field_options: {
+                    include_highlights: false
+                }
+            })
+        });
 
-    grid.appendChild(link);
-  }
-}
-
-function addSeeMoreButton() {
-  const grid = document.getElementById('browse-events-grid');
-  const existingButton = document.getElementById('see-more-button');
-  if (existingButton) {
-    existingButton.remove();
-  }
-
-  if (currentIndex < allEvents.length) {
-    const button = document.createElement('button');
-    button.id = 'see-more-button';
-    button.textContent = 'See more';
-    button.addEventListener('click', loadMoreEvents);
-    grid.appendChild(button);
-  }
-}
-
-function loadMoreEvents() {
-  const endIndex = Math.min(currentIndex + EVENTS_PER_PAGE, allEvents.length);
-  for (let i = currentIndex; i < endIndex; i++) {
-    addEventLink(allEvents[i]);
-  }
-  currentIndex = endIndex;
-  addSeeMoreButton();
-}
-
-async function main() {
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      try {
-        await refreshDropboxAccessToken();  // Refresh token once at the beginning
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const year = urlParams.get('year');
-
-        const yearFolders = await findYearFolders();
-
-        if (year) {
-          const yearPath = await findYearFolder(year);
-          for (const year of yearFolders) {
-            await addYearLink(year);
-          }
-          if (yearPath) {
-            allEvents = await findEventFolders(yearPath);
-            
-            // Sort events by name
-            allEvents.sort((a, b) => a.name.localeCompare(b.name));
-
-            loadMoreEvents();
-          } else {
-            console.error(`Year folder ${year} not found`);
-          }
-        } else {
-          console.error('No year specified in URL parameters');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-      } catch (error) {
-        console.error('Error fetching event folders:', error);
-      }
-    } else {
-      console.log('User not signed in');
+
+        const data = await response.json();
+        
+        const exactMatches = data.matches.filter(match => 
+            match.metadata.metadata['.tag'] === 'folder' && 
+            match.metadata.metadata.name === year
+        );
+
+        const eventBentoGrid = document.getElementById('event-bento-grid');
+        if (!eventBentoGrid) {
+            console.error('Element with id "event-bento-grid" not found');
+            return;
+        }
+
+        if (exactMatches.length > 0) {
+            for (const match of exactMatches) {
+                const folderPath = match.metadata.metadata.path_lower;
+                const folderContents = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        path: folderPath,
+                        recursive: false,
+                        include_media_info: false,
+                        include_deleted: false,
+                        include_has_explicit_shared_members: false,
+                        include_mounted_folders: false,
+                        limit: 2000
+                    })
+                }).then(res => res.json());
+
+                for (const item of folderContents.entries) {
+                    if (item['.tag'] === 'folder') {
+                        const imageData = await getMostRecentImageFromFolder(item.path_lower);
+                        if (imageData && imageData.thumbnails) {
+                            // Create an 'a' element
+                            const folderLink = document.createElement('a');
+                            folderLink.className = 'folder-item';
+
+                            // Set the href attribute to include year and path
+                            const encodedPath = encodeURIComponent(item.path_lower);
+                            const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedPath}`;
+                            folderLink.href = href;
+
+                            // Create an img element with responsive images
+                            const img = document.createElement('img');
+                            img.alt = item.name;
+                            img.loading = 'lazy'; // Implement lazy loading
+
+                            // Set the styles as per your requirements
+                            img.style.maxHeight = '100px';
+                            img.style.width = '100%';
+                            img.style.objectFit = 'cover';
+                            img.style.borderRadius = '4px';
+
+                            // Construct srcset and sizes attributes
+                            img.src = imageData.thumbnails['w256h256']; // Fallback image
+                            img.srcset = `
+                                ${imageData.thumbnails['w256h256']} 256w,
+                                ${imageData.thumbnails['w640h480']} 640w,
+                                ${imageData.thumbnails['w1024h768']} 1024w
+                            `;
+                            img.sizes = '(max-width: 600px) 256px, (max-width: 1200px) 640px, 1024px';
+
+                            // Append the image to the folder link
+                            folderLink.appendChild(img);
+
+                            // Optionally, add a caption
+                            const caption = document.createElement('p');
+                            caption.textContent = item.name;
+                            folderLink.appendChild(caption);
+
+                            // Append the folder link to the grid
+                            eventBentoGrid.appendChild(folderLink);
+                        } else {
+                            console.log(`Folder skipped (no images): ${item.path_display}`);
+                        }
+                    }
+                }
+            }
+        } else {
+            const noResultsDiv = document.createElement('div');
+            noResultsDiv.textContent = `No folders named exactly '${year}' were found.`;
+            eventBentoGrid.appendChild(noResultsDiv);
+        }
+
+        console.log(`Finished listing folders for ${year}.`);
+
+    } catch (error) {
+        console.error('Error searching Dropbox folders:', error);
+        console.error('Error details:', error.message);
+        
+        const errorDiv = document.createElement('div');
+        errorDiv.textContent = `Error: ${error.message}`;
+        document.getElementById('event-bento-grid').appendChild(errorDiv);
     }
-  });
 }
 
-main();
+listExactYearFolders();
 
-// Export the events variable
-export { allEvents as events };
+
+
+
