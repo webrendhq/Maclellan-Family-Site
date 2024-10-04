@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Maclellen Family</title>
+    <link rel="stylesheet" href="css/sign-in.css">
+    <script type="module" src="js/sign-in.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropbox.js/10.15.0/Dropbox-sdk.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+    
+    
+            // THIS IS TO SWITCH THE SLIDES   
+            
+            // Get the elements
+            const fadeOutButton = document.getElementById('signin-choice');
+            const fadeInButton = document.getElementById('signup-choice');
+            const signInElement = document.getElementById('signin-form');
+            const signUpElement = document.getElementById('signup-form');
+
+            // Function to fade out
+            function fadeOut(element) {
+                let opacity = 1;
+                const timer = setInterval(function() {
+                    if (opacity <= 0.1) {
+                        clearInterval(timer);
+                        element.style.display = 'none';
+                    }
+                    element.style.opacity = opacity;
+                    opacity -= opacity * 0.1;
+                }, 20);
+            }
+
+            // Function to fade in
+            function fadeIn(element) {
+                let opacity = 0.1;
+                element.style.display = 'flex';
+                const timer = setInterval(function() {
+                    if (opacity >= 1) {
+                        clearInterval(timer);
+                    }
+                    element.style.opacity = opacity;
+                    opacity += opacity * 0.1;
+                }, 20);
+            }
+
+            // Event listener for sign in button (fade out sign up, fade in sign in)
+            fadeOutButton.addEventListener('click', function() {
+                fadeOut(signUpElement);
+                fadeIn(signInElement);
+            });
+
+            // Event listener for sign up button (fade out sign in, fade in sign up)
+            fadeInButton.addEventListener('click', function() {
+                fadeOut(signInElement);
+                fadeIn(signUpElement);
+            });
+        });
+    </script>
+</head>
+<body>
+    <section class="sign-in-photo"></section>
+
+
+    
+    <section class="sign-in-section">
+
+
+
+
+
+
+
+
+
+
+
+        <div class="firebase-auth-wrapper">
+            <form class="sign-up-wrapper" id="signup-form" method="POST" action="javascript:void(0);">
+                <h3>Sign Up</h3>
+                <input class="name-input" id ="signup-name" placeholder="Name" type="plain">
+                <input class="email-input" id="signup-email" placeholder="Email">
+                <input class="password-input" id="signup-password" placeholder="Password">
+                <button class="sign-up-button" id="signup-button" type="submit">Sign Up</button>   
+                <div class="firebase-panel-prompt">
+                    <p id="signup-error-message"></p>
+                    <p>Already have an account?</p>
+                    <button id="signin-choice">Sign In</button>
+                </div>
+            </form>
+            
+            <form class="sign-in-wrapper" id="signin-form" method="POST" action="javascript:void(0);">
+                <h3>Sign In</h3>
+                <input class="email-input" id ="signin-email" placeholder="Email" type="email">
+                <input class="password-input" id="signin-password" placeholder="Password" type="password">
+                <button class="sign-in-button" id="signin-button" type="submit">Sign In</button> 
+                <div class="firebase-panel-prompt">
+                    <p id="signin-error-message"></p>
+                    <p>Don't have an account?</p>
+                    <button id="signup-choice">Sign Up</button>
+                </div>  
+            </form>
+            
+        </div>
+    </section>
+
+</body>
+</html>
