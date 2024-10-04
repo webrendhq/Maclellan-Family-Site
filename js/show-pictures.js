@@ -1,14 +1,126 @@
 // Import necessary functions and tokens
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 
-import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-onAuthStateChanged(auth, (user) => {
+import { auth, onAuthStateChanged, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
+
+let isAdmin = false;
+
+onAuthStateChanged(auth, async (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
         window.location.href = '/sign-in.html';
+    } else {
+        // Check if the user is an admin
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        isAdmin = userDoc.exists() && userDoc.data().role === 'admin';
+        // If a user is signed in, allow access to the current page and list images.
+        listImagesAndVideosInFolder();
     }
-    // If a user is signed in, do nothing and allow access to the current page.
 });
+
+function createDeleteButton(file) {
+    const deleteButton = document.createElement('button');
+    deleteButton.innerHTML = '&#10006;'; // 'x' character
+    deleteButton.className = 'delete-button';
+    deleteButton.style.cssText = `
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background-color: rgba(255, 255, 255, 0.7);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        color: red;
+    `;
+    
+    deleteButton.onclick = (e) => {
+        e.stopPropagation(); // Prevent opening the image modal
+        showDeleteConfirmationModal(file);
+    };
+    
+    return deleteButton;
+}
+
+function showDeleteConfirmationModal(file) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.4);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background-color: #fefefe;
+        padding: 20px;
+        border-radius: 5px;
+        text-align: center;
+    `;
+    
+    modalContent.innerHTML = `
+        <h2>Confirm Deletion</h2>
+        <p>Are you sure you want to delete ${file.name}?</p>
+        <button id="confirmDelete" style="margin-right: 10px;">Yes, Delete</button>
+        <button id="cancelDelete">Cancel</button>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    document.getElementById('confirmDelete').onclick = () => {
+        deleteFile(file);
+        document.body.removeChild(modal);
+    };
+    
+    document.getElementById('cancelDelete').onclick = () => {
+        document.body.removeChild(modal);
+    };
+}
+
+async function deleteFile(file) {
+    try {
+        await refreshDropboxAccessToken();
+        const response = await fetch('https://api.dropboxapi.com/2/files/delete_v2', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                path: file.path_lower
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Remove the file from the UI
+        const fileElement = document.querySelector(`[data-path="${file.path_lower}"]`);
+        if (fileElement) {
+            fileElement.remove();
+        }
+
+        console.log(`File deleted successfully: ${file.name}`);
+    } catch (error) {
+        console.error('Error deleting file:', error);
+        alert('Failed to delete the file. Please try again.');
+    }
+}
 
 // Function to get URL parameters
 function getUrlParameter(name) {
@@ -154,6 +266,8 @@ function openModal(tempLink, fileName) {
 }
 
 // Main function to list images and videos in a folder
+// Main function to list images and videos in a folder
+// Main function to list images and videos in a folder
 async function listImagesAndVideosInFolder() {
     if (!year || !path) {
         console.error('No year or path specified in URL parameters. Use ?year=YYYY&path=PATH in the URL.');
@@ -204,8 +318,20 @@ async function listImagesAndVideosInFolder() {
             return;
         }
 
+        // Clear existing content
+        eventBentoGrid.innerHTML = '';
+
+        // Set to keep track of added files
+        const addedFiles = new Set();
+
         if (mediaFiles.length > 0) {
             for (const file of mediaFiles) {
+                // Check if the file has already been added
+                if (addedFiles.has(file.path_lower)) {
+                    console.log(`Skipping duplicate file: ${file.path_lower}`);
+                    continue;
+                }
+
                 // Get thumbnails of 'w64h64' size
                 const thumbnails = await getThumbnails(file.path_lower);
 
@@ -214,6 +340,8 @@ async function listImagesAndVideosInFolder() {
                     const fileLink = document.createElement('a');
                     fileLink.className = 'file-item';
                     fileLink.href = '#'; // Prevent default navigation
+                    fileLink.style.position = 'relative'; // For positioning the delete button
+                    fileLink.dataset.path = file.path_lower; // Add data attribute for easy selection
 
                     // Event listener for opening the modal
                     fileLink.addEventListener('click', async function(event) {
@@ -266,6 +394,12 @@ async function listImagesAndVideosInFolder() {
                     // Append the image to the file link
                     fileLink.appendChild(img);
 
+                    // Add delete button for admin users
+                    if (isAdmin) {
+                        const deleteButton = createDeleteButton(file);
+                        fileLink.appendChild(deleteButton);
+                    }
+
                     // Optionally, add a caption
                     const caption = document.createElement('p');
                     caption.textContent = file.name;
@@ -273,6 +407,9 @@ async function listImagesAndVideosInFolder() {
 
                     // Append the file link to the grid
                     eventBentoGrid.appendChild(fileLink);
+
+                    // Mark this file as added
+                    addedFiles.add(file.path_lower);
                 } else {
                     console.log(`File skipped (no thumbnail): ${file.path_display}`);
                 }

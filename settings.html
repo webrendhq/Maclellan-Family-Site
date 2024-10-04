@@ -142,7 +142,7 @@
             <form id="updateFolderForm">
                 <label for="newFolderName">New Folder Name:</label>
                 <input placeholder="e.g. Howard" type="text" class="input w-input" id="newFolderName" required>
-                <button type="submit">Update</button>
+                <button class="settings-button" type="submit">Update</button>
             </form>
 
             <p id="status"></p>
@@ -205,7 +205,7 @@
           <div class="modal-content">
               <span class="close">&times;</span>
               <p>Please verify your email before changing it.</p>
-              <button id="verifyEmail">Verify Email</button>
+              <button class="settings-button" id="verifyEmail">Verify Email</button>
           </div>
         </div>
         <div data-w-tab="Email" class="w-tab-pane">
@@ -213,12 +213,12 @@
             <h1>Change Email</h1>
             <form id="emailChangeForm">
                 <label for="newEmail">New Email:</label>
-                <input type="email" id="newEmail" name="newEmail" required>
+                <input placeholder="eg. johndoe@email.com" class="input w-input" type="email" id="newEmail" name="newEmail" required>
                 <br>
                 <label for="emailPassword">Password:</label>
-                <input type="password" id="emailPassword" name="emailPassword" required>
+                <input placeholder="eg. password" class="input w-input" type="password" id="emailPassword" name="emailPassword" required>
                 <br>
-                <button type="submit">Change Email</button>
+                <button class="settings-button" type="submit">Change Email</button>
             </form>
             
             
@@ -243,12 +243,12 @@
             <h1>Change Password</h1>
             <form id="passwordChangeForm">
                 <label for="oldPassword">Old Password:</label>
-                <input type="password" id="oldPassword" name="oldPassword" required>
+                <input placeholder="eg. password" class="input w-input" type="password" id="oldPassword" name="oldPassword" required>
                 <br>
                 <label for="newPassword">New Password:</label>
-                <input type="password" id="newPassword" name="newPassword" required>
+                <input placeholder="eg. password" class="input w-input" type="password" id="newPassword" name="newPassword" required>
                 <br>
-                <button type="submit">Change Password</button>
+                <button class="settings-button" type="submit">Change Password</button>
             </form>
 
 
@@ -272,21 +272,39 @@
 
           </div>
         </div>
+        <div id="uploadModal" class="upload_modal">
+          <div class="upload_modal-content">
+              <span class="close">&times;</span>
+              <div id="drop-area">
+                  <p>Drag and drop files here or click to select files</p>
+                  <input type="file" id="fileElem" multiple accept="image/*,video/*" style="display:none">
+              </div>
+              <div id="gallery"></div>
+              <div id="folderSelects"></div>
+              <button class="settings-button" id="uploadToDropbox" style="display:show;">Upload to Dropbox</button>
+              <button class="settings-button" id="createFolderBtn">Create New Folder</button>
+
+          </div>
+      </div>
         <div data-w-tab="Checklist" class="w-tab-pane">
           <div class="no-margin w-form">
             <div id="adminPanel" style="display: none;">
               <h2>User Role Management</h2>
-              <input type="text" id="userIdInput" placeholder="Enter user's email">
-              <button onclick="changeToAdmin()">Change to Admin</button>
-              <button onclick="changeToUser()">Change to User</button>
+              <input class="input w-input" type="text" id="userIdInput" placeholder="Enter user's email">
+              <button class="settings-button" onclick="changeToAdmin()">Change to Admin</button>
+              <button class="settings-button" onclick="changeToUser()">Change to User</button>
+              <button class="settings-button" id="uploadBtn">Upload</button>
             </div>
+            
+
+            
             <div id="userList" style="display: none;"></div>
             <div id="deleteModal" class="yesorno_modal">
               <div class="yesorno_modal-content">
                   <h2>Confirm Account Deletion</h2>
                   <p>Are you sure you want to delete the account for <span id="deleteUserInfo"></span>?</p>
-                  <button onclick="confirmDelete()">Yes, Delete</button>
-                  <button onclick="closeModal()">No, Cancel</button>
+                  <button class="settings-button" onclick="confirmDelete()">Yes, Delete</button>
+                  <button class="settings-button" onclick="closeModal()">No, Cancel</button>
               </div>
             </div>
 
@@ -295,22 +313,7 @@
 
 
 
-            <button id="uploadBtn">Upload</button>
-
-            <div id="uploadModal" class="upload_modal">
-                <div class="upload_modal-content">
-                    <span class="close">&times;</span>
-                    <div id="drop-area">
-                        <p>Drag and drop files here or click to select files</p>
-                        <input type="file" id="fileElem" multiple accept="image/*,video/*" style="display:none">
-                    </div>
-                    <div id="gallery"></div>
-                    <div id="folderSelects"></div>
-                    <button id="uploadToDropbox" style="display:none;">Upload to Dropbox</button>
-                    <button id="createFolderBtn">Create New Folder</button>
-
-                </div>
-            </div>
+            
 
 
 

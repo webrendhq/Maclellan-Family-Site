@@ -43,37 +43,40 @@ function updateYearHeader() {
       if (yearElement2) {
           yearElement2.textContent = year;
       }
-  } else {
-      // Optional: Set default text if no year is found
-      // if (yearElement1) yearElement1.textContent = 'Year not specified';
-      // if (yearElement2) yearElement2.textContent = 'Year not specified';
   }
 }
 
 function getEventFromURL() {
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('path');
+  const path = urlParams.get('path');
+  if (path) {
+    const decodedPath = decodeURIComponent(path);
+    const parts = decodedPath.split('/');
+    const lastPart = parts[parts.length - 1];
+    return capitalizeWords(lastPart);
+  }
+  return '';
+}
+
+function capitalizeWords(str) {
+  return str.replace(/\b\w/g, l => l.toUpperCase());
 }
 
 function updateEventHeader() {
-  const eventParam = getEventFromURL();
+  const event = getEventFromURL();
   
-  if (eventParam) {
+  if (event) {
       // Get both elements by their IDs
       const eventElement1 = document.getElementById('event-current');
       const eventElement2 = document.getElementById('event-current2');
       
       // Update the text content if the elements exist
       if (eventElement1) {
-          eventElement1.textContent = eventParam;
+          eventElement1.textContent = event;
       }
       if (eventElement2) {
-          eventElement2.textContent = eventParam;
+          eventElement2.textContent = event;
       }
-  } else {
-      // Optional: Set default text if no event is found
-      // if (eventElement1) eventElement1.textContent = 'Event not specified';
-      // if (eventElement2) eventElement2.textContent = 'Event not specified';
   }
 }
 
