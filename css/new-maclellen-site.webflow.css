@@ -10,6 +10,12 @@
   display: table;
 }
 
+a{
+  color: white;
+  font-size: 16px;
+  padding: 4px;
+}
+
 .w-checkbox:after {
   content: " ";
   clear: both;
@@ -98,6 +104,22 @@
 
 .folder-file-one {
   padding-top: 3%;
+}
+
+.folder-item{
+  padding: 10px;
+  gap: 16px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.873);
+  backdrop-filter: blur(20px);
+
+}
+
+.folder-item:hover{
+  background-color: salmon;
 }
 
 .tab-link-tab-2 {
@@ -257,7 +279,8 @@
 
 .nav-buttons:hover {
   filter: none;
-  background-color: #000;
+  background-color: #0000007d;
+  backdrop-filter: blur(20px);
 }
 
 .nav-buttons.you {
@@ -281,8 +304,8 @@
 }
 
 body {
-  background-color: #d1e7fb;
-  background-image: url('../images/noise.png');
+  background-color: #ffffff; /* #d1e7fb */
+  /* background-image: url('../images/noise.png'); */
   background-size: 10px 10px; /* Shrinks the background image to 10px by 10px */
   background-repeat: repeat; /* Tiles the background image */
   background-position: top left; /* Position the background at the top left */
@@ -596,7 +619,7 @@ body {
   height: 8vh;
   position: fixed;
   inset: 0% 0% auto;
-  box-shadow: inset 0 8vh 25px -20px #d1e7fb;
+  box-shadow: inset 0 8vh 25px -20px #ffffff;
 }
 
 .white-shadows-bottom {
@@ -604,7 +627,7 @@ body {
   height: 5vh;
   position: fixed;
   inset: auto 0% 0%;
-  box-shadow: inset 0 -4vh 25px -20px #d1e7fb;
+  box-shadow: inset 0 -4vh 25px -20px #ffffff;
 }
 
 .headers-wrapper {
