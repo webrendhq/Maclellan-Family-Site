@@ -28,6 +28,25 @@
   <script type="module" src="js/browse-years-nav.js"></script>
   <script type="module" src="js/show-pictures.js"></script>
   <!-- <script type="module" src="js/search.js"></script> -->
+
+  <script type="module">
+    document.getElementById('search-button').addEventListener('click', function() {
+        const searchInput = document.getElementById('search-input').value.trim();
+        if (searchInput) {
+            window.location.href = `/search.html?query=${encodeURIComponent(searchInput)}`;
+        }
+    });
+
+    // Add event listener for pressing Enter in the search input
+    document.getElementById('search-input').addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            const searchInput = document.getElementById('search-input').value.trim();
+            if (searchInput) {
+                window.location.href = `/search.html?query=${encodeURIComponent(searchInput)}`;
+            }
+        }
+    });
+  </script>
   
   
   <link href="images/favicon.ico" rel="shortcut icon" type="image/x-icon">
@@ -36,7 +55,10 @@
 <body class="body-3">
   <div class="nav-bar-wrapper">
     <div class="search-bar-box"><img src="images/search.png" loading="lazy" alt="" class="image">
-      <div class="search-bar-wrapper-pffoccial"></div>
+      <div class="search-bar-wrapper-pffoccial">
+        <input class="search-bar" id="search-input" placeholder="Search for your favorite moment...">
+        <button class="search-button" id="search-button">Search</button>
+      </div>
       <div class="year-select"></div>
     </div>
     <div class="nav-button-wrapper">
