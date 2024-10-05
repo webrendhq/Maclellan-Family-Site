@@ -22,7 +22,7 @@ const year = getUrlParameter('year');
 
 // Modified getThumbnailBlob to always use 'w64h64' and implement caching
 async function getThumbnailBlob(path) {
-    const size = 'w64h64'; // Enforce 64x64 resolution
+    const size = 'w128h128'; // Enforce 64x64 resolution
     const cacheKey = `${path}_${size}`;
     const cache = await caches.open('thumbnails-cache');
 
@@ -249,6 +249,23 @@ async function listExactYearFolders() {
                     }
                 }
             }
+
+            // Initialize Isotope after all folder items are added
+            const iso = new Isotope(eventBentoGrid, {
+                itemSelector: '.folder-item',
+                layoutMode: 'masonry',
+                percentPosition: true,
+                masonry: {
+                    columnWidth: '.folder-item',
+                    gutter: 10
+                }
+            });
+
+            // Ensure layout updates once all images are loaded
+            imagesLoaded(eventBentoGrid, function () {
+                iso.layout();
+            });
+
         } else {
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No folders named exactly '${year}' were found.`;
@@ -269,5 +286,6 @@ async function listExactYearFolders() {
         }
     }
 }
+
 
 listExactYearFolders();

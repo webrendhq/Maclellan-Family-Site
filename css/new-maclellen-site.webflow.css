@@ -106,21 +106,7 @@ a{
   padding-top: 3%;
 }
 
-.folder-item{
-  padding: 10px;
-  gap: 16px;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  border-radius: 6px;
-  background-color: rgba(0, 0, 0, 0.873);
-  backdrop-filter: blur(20px);
 
-}
-
-.folder-item:hover{
-  background-color: salmon;
-}
 
 .tab-link-tab-2 {
   z-index: 0;
@@ -2038,7 +2024,7 @@ body {
     width: 100%;
   }
 
-  .bento-grid-event {
+  /* .bento-grid-event {
     grid-column-gap: 16px;
     grid-row-gap: 16px;
     flex-flow: column;
@@ -2048,7 +2034,64 @@ body {
     justify-content: flex-start;
     align-items: stretch;
     display: flex;
+  } */
+
+
+  /* .folder-item{
+    padding: 10px;
+    gap: 16px;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0.873);
+    backdrop-filter: blur(20px);
+  
   }
+  
+  .folder-item:hover{
+    background-color: salmon;
+  } */
+
+/* Grid container */
+#event-bento-grid {
+  width: 100%; /* Full width of the container */
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 auto; /* Center the grid */
+  justify-content: center;
+}
+
+/* Individual grid items */
+.folder-item {
+  width: 30%; /* You can adjust this percentage depending on how many columns you want */
+  margin-bottom: 10px; /* Add space between grid items */
+  box-sizing: border-box;
+  transition: transform 0.3s ease; /* Add a subtle transition for hover effects */
+}
+
+/* Image styling inside grid items */
+.folder-item img {
+  width: 100%; /* Ensures the image takes up the full width of the grid item */
+  height: 200px; /* Set a fixed height, you can adjust this based on the desired look */
+  object-fit: cover; /* Ensures the image covers the area without distortion */
+  border-radius: 4px; /* Rounded corners */
+}
+
+/* Optional caption under each image */
+.folder-item p {
+  text-align: center;
+  margin-top: 5px;
+  font-size: 14px;
+  color: #333;
+  font-family: 'Arial', sans-serif;
+}
+
+
+
+
+
+
 
   .heading-4 {
     margin-top: 0;
