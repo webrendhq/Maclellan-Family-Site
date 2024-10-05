@@ -130,6 +130,7 @@ async function getMostRecentImageFromFolder(folderPath) {
 }
 
 // Main function to list folders and display images
+// Main function to list folders and display images
 async function listExactYearFolders(folderPath) {
     if (!year) {
         console.error('No year specified in URL parameters. Use ?year=YYYY in the URL.');
@@ -244,9 +245,9 @@ async function listExactYearFolders(folderPath) {
                         img.alt = item.name;
                         img.loading = 'lazy'; // Implement lazy loading
 
-                        // Set the styles to enforce 64x64 resolution
+                        // Set the styles for the image
                         img.style.width = '100%';
-                        img.style.height = '100px';
+                        img.style.height = 'auto'; // Auto for height to keep aspect ratio
                         img.style.objectFit = 'cover';
                         img.style.borderRadius = '4px';
 
@@ -268,6 +269,23 @@ async function listExactYearFolders(folderPath) {
                     }
                 }
             }
+
+            // Initialize Isotope after all folder items are added
+            const iso = new Isotope(eventBentoGrid, {
+                itemSelector: '.folder-item',
+                layoutMode: 'masonry',
+                percentPosition: true,
+                masonry: {
+                    columnWidth: '.folder-item',
+                    horizontalOrder: true, // Ensure vertical stacking
+                    gutter: 10              // Space between items
+                }
+            });
+
+            // Ensure layout updates once all images are loaded
+            imagesLoaded(eventBentoGrid, function () {
+                iso.layout();
+            });
         } else {
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No folders found in '${yearFolderPath}'.`;
@@ -285,6 +303,7 @@ async function listExactYearFolders(folderPath) {
         document.getElementById('event-bento-grid2').appendChild(errorDiv);
     }
 }
+
 
 // Main function to authenticate and initiate folder listing
 onAuthStateChanged(auth, async (user) => {

@@ -2076,6 +2076,15 @@ body {
   position: relative;
 }
 
+#event-bento-grid2 {
+  width: 100%; /* Full width */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0 auto;
+  position: relative;
+}
+
 /* Individual grid items */
 .folder-item {
   width: 100%; /* Adjust this width to define the column size */
