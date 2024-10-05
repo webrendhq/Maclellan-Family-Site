@@ -135,7 +135,7 @@ const path = getUrlParameter('path');
 
 // Modified getThumbnailBlob function to always use 'w64h64'
 async function getThumbnailBlob(filePath) {
-    const size = 'w64h64'; // Fixed size
+    const size = 'w128h128'; // Fixed size
     const cacheKey = `${filePath}_${size}`;
     const cache = await caches.open('thumbnails-cache');
 
@@ -189,7 +189,7 @@ async function getThumbnailBlob(filePath) {
 
 // Modified getThumbnails function to only fetch 'w64h64' size
 async function getThumbnails(filePath) {
-    const size = 'w64h64'; // Only one size
+    const size = 'w128h128'; // Only one size
     const thumbnails = {};
 
     const blob = await getThumbnailBlob(filePath);
@@ -268,6 +268,7 @@ function openModal(tempLink, fileName) {
 // Main function to list images and videos in a folder
 // Main function to list images and videos in a folder
 // Main function to list images and videos in a folder
+// Main function to list images and videos in a folder
 async function listImagesAndVideosInFolder() {
     if (!year || !path) {
         console.error('No year or path specified in URL parameters. Use ?year=YYYY&path=PATH in the URL.');
@@ -332,7 +333,7 @@ async function listImagesAndVideosInFolder() {
                     continue;
                 }
 
-                // Get thumbnails of 'w64h64' size
+                // Get thumbnails of 'w128h128' size
                 const thumbnails = await getThumbnails(file.path_lower);
 
                 if (thumbnails && Object.keys(thumbnails).length > 0) {
@@ -382,14 +383,14 @@ async function listImagesAndVideosInFolder() {
                     img.alt = file.name;
                     img.loading = 'lazy'; // Implement lazy loading
 
-                    // Set the styles to enforce 64x64 resolution
+                    // Set the styles to enforce 128x128 resolution
                     img.style.width = '100%';
-                    img.style.height = '100px';
+                    img.style.height = 'auto';
                     img.style.objectFit = 'cover';
                     img.style.borderRadius = '4px';
 
-                    // Set the src to the 'w64h64' thumbnail
-                    img.src = thumbnails['w64h64'];
+                    // Set the src to the 'w128h128' thumbnail
+                    img.src = thumbnails['w128h128'];
 
                     // Append the image to the file link
                     fileLink.appendChild(img);
@@ -409,11 +410,28 @@ async function listImagesAndVideosInFolder() {
                     eventBentoGrid.appendChild(fileLink);
 
                     // Mark this file as added
-                    addedFiles.add(file.path_lower);
+                    addedFiles.add(file.path_lower);  // Add the file path to the Set
                 } else {
                     console.log(`File skipped (no thumbnail): ${file.path_display}`);
                 }
             }
+
+            // Initialize Isotope after appending all folder items
+            const iso = new Isotope(eventBentoGrid, {
+                itemSelector: '.file-item',
+                layoutMode: 'masonry',
+                percentPosition: true,
+                masonry: {
+                    columnWidth: '.file-item',  // Use the file-item width for the columns
+                    horizontalOrder: true       // Ensure vertical stacking of items
+                }
+            });
+
+            // Use imagesLoaded to ensure proper layout after all images are loaded
+            imagesLoaded(eventBentoGrid, function () {
+                iso.layout();
+            });
+
         } else {
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No images or videos found in the folder '${path}'.`;
@@ -432,4 +450,6 @@ async function listImagesAndVideosInFolder() {
     }
 }
 
+
 listImagesAndVideosInFolder();
+

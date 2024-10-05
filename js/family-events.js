@@ -226,7 +226,7 @@ async function listExactYearFolders() {
 
                             // Set the styles to enforce 64x64 resolution
                             img.style.width = '100%';
-                            img.style.height = '100px';
+                            img.style.height = 'auto';
                             img.style.objectFit = 'cover';
                             img.style.borderRadius = '4px';
 
@@ -256,9 +256,14 @@ async function listExactYearFolders() {
                 layoutMode: 'masonry',
                 percentPosition: true,
                 masonry: {
-                    columnWidth: '.folder-item',
-                    gutter: 10
+                    columnWidth: '.folder-item',  // Use folder-item width as the column size
+                    horizontalOrder: true         // Stack items vertically, filling one column before the next
                 }
+            });
+
+            // Ensure layout updates once all images are loaded
+            imagesLoaded(eventBentoGrid, function () {
+                iso.layout();
             });
 
             // Ensure layout updates once all images are loaded

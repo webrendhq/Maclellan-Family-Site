@@ -11,9 +11,18 @@
 }
 
 a{
-  color: white;
+  color: rgb(255, 255, 255);
   font-size: 16px;
   padding: 4px;
+  text-decoration: none;
+  border-radius: 10px;
+  
+  
+
+}
+
+a:hover{
+  backdrop-filter: blur(20px);
 }
 
 .w-checkbox:after {
@@ -52,15 +61,18 @@ a{
 .total-wrapper {
   z-index: auto;
   flex-flow: column;
-  justify-content: space-between;
-  align-items: stretch;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
   width: 95%;
   margin-top: 0;
   margin-left: auto;
   margin-right: 0;
   padding: 0;
   display: flex;
+  flex-direction: column;
   position: relative;
+  padding-left: 2vw;
 }
 
 .section {
@@ -934,26 +946,21 @@ body {
   grid-column-gap: 16px;
   grid-row-gap: 16px;
   box-shadow: none;
-  -webkit-backdrop-filter: blur(50px);
-  backdrop-filter: blur(50px);
   background-color: #0000;
   border: 3px #000;
   border-radius: 30px 30px 0 0;
-  grid-template-rows: 10rem 10rem 10rem 10rem 10rem 10rem 10rem 10rem;
-  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
-  grid-auto-rows: 10rem;
-  grid-auto-columns: 1fr;
-  grid-auto-flow: row;
-  width: 75%;
+
+  width:100%;
   max-width: none;
   height: auto;
   min-height: 100vh;
   margin: 0 auto 0;
   padding: 16px 16px 5vw;
-  display: grid;
+  display: flex;
   position: relative;
   inset: 0%;
   overflow: hidden;
+  flex-direction: column;
 }
 
 .heading-4 {
@@ -969,7 +976,7 @@ body {
   display: flex;
 }
 
-.bento-grid-your-pictures {
+/* .bento-grid-your-pictures {
   z-index: 2;
   grid-column-gap: 16px;
   grid-row-gap: 16px;
@@ -1036,7 +1043,7 @@ body {
   opacity: 1;
   transform: translate(0, -5px);
   box-shadow: 0 4px 20px -5px #0000008c;
-}
+} */
 
 .search-bento-grid {
   z-index: 2;
@@ -2053,29 +2060,35 @@ body {
     background-color: salmon;
   } */
 
+
+/* .bento-grid-event {
+  display: flex;
+  flex-direction: column;
+} */
+
 /* Grid container */
 #event-bento-grid {
-  width: 100%; /* Full width of the container */
+  width: 100%; /* Full width */
   display: flex;
   flex-wrap: wrap;
-  margin: 0 auto; /* Center the grid */
   justify-content: center;
+  margin: 0 auto;
+  position: relative;
 }
 
 /* Individual grid items */
 .folder-item {
-  width: 30%; /* You can adjust this percentage depending on how many columns you want */
-  margin-bottom: 10px; /* Add space between grid items */
-  box-sizing: border-box;
-  transition: transform 0.3s ease; /* Add a subtle transition for hover effects */
+  width: 100%; /* Adjust this width to define the column size */
+  margin-bottom: 10px;
+  box-sizing: border-box; /* Ensure padding and borders are included in the item size */
 }
 
 /* Image styling inside grid items */
 .folder-item img {
-  width: 100%; /* Ensures the image takes up the full width of the grid item */
-  height: 200px; /* Set a fixed height, you can adjust this based on the desired look */
-  object-fit: cover; /* Ensures the image covers the area without distortion */
-  border-radius: 4px; /* Rounded corners */
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 4px;
 }
 
 /* Optional caption under each image */
@@ -2083,7 +2096,7 @@ body {
   text-align: center;
   margin-top: 5px;
   font-size: 14px;
-  color: #333;
+  color: #000000;
   font-family: 'Arial', sans-serif;
 }
 
@@ -2105,7 +2118,7 @@ body {
     padding-top: 10vh;
   }
 
-  .bento-grid-your-pictures {
+  /* .bento-grid-your-pictures {
     grid-column-gap: 16px;
     grid-row-gap: 16px;
     flex-flow: column;
@@ -2120,7 +2133,7 @@ body {
   .bento-grid-your-pictures-rectangle, .bento-grid-your-pictures-square {
     width: 100%;
     height: 100%;
-  }
+  } */
 
   .search-bento-grid {
     grid-column-gap: 16px;
@@ -2463,15 +2476,29 @@ body {
 
 
 
-.file-item {
-  text-decoration: none;
-  color: inherit;
+#event-n-year-bento-grid {
+  width: 100%; /* Full width */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
 }
+
+
+.file-item {
+  width: 30%; /* Adjust this percentage to control the number of columns */
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+
 .file-item img {
   width: 100%;
   height: auto;
   border-radius: 4px;
 }
+
 .file-item p {
   text-align: center;
   margin-top: 5px;
