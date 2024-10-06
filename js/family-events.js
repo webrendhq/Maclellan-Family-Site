@@ -10,16 +10,23 @@ const GITHUB_REPO_NAME = 'Maclellen-Frontend';
 const GITHUB_IMAGE_FOLDER = 'images';
   
 // Function to trigger GitHub Action for image upload
-const queue = [];
-let isProcessing = false;
 
-// Modified triggerGitHubAction function
-async function triggerGitHubAction(imagePath, imageBlob) {
+// Helper function to convert Blob to base64
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function commitImageToGitHub(imagePath, imageBlob) {
     try {
         const base64 = await blobToBase64(imageBlob);
-        
-        // Trigger GitHub Action workflow without authentication
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/images`, {
+        const content = base64.split(',')[1]; // Remove the data:image/jpeg;base64, part
+
+        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`, {
             method: 'POST',
             headers: {
                 'Accept': 'application/vnd.github.v3+json',
@@ -29,7 +36,7 @@ async function triggerGitHubAction(imagePath, imageBlob) {
                 event_type: 'upload_image',
                 client_payload: {
                     image_path: `${GITHUB_IMAGE_FOLDER}/${imagePath}`,
-                    image_data: base64
+                    image_content: content
                 }
             })
         });
@@ -38,89 +45,10 @@ async function triggerGitHubAction(imagePath, imageBlob) {
             throw new Error(`GitHub API error: ${response.status}`);
         }
 
-        console.log(`Triggered GitHub Action for image: ${imagePath}`);
+        console.log(`Triggered image upload for: ${imagePath}`);
     } catch (error) {
-        console.error('Error triggering GitHub Action:', error);
+        console.error('Error triggering image upload:', error);
     }
-}
-
-// Helper function to convert Blob to base64 (remains unchanged)
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function processQueue() {
-    if (queue.length === 0) {
-        isProcessing = false;
-        return;
-    }
-    
-    isProcessing = true;
-    const { imagePath, imageBlob } = queue.shift();
-    
-    try {
-        const chunkSize = 1024 * 1024; // 1MB chunks
-        const totalChunks = Math.ceil(imageBlob.size / chunkSize);
-        
-        for (let i = 0; i < totalChunks; i++) {
-            const start = i * chunkSize;
-            const end = Math.min(start + chunkSize, imageBlob.size);
-            const chunk = imageBlob.slice(start, end);
-            
-            await uploadChunk(imagePath, i, totalChunks, chunk);
-        }
-        
-        console.log(`Uploaded image: ${imagePath}`);
-    } catch (error) {
-        console.error('Error uploading image:', error);
-    }
-    
-    // Process next item in the queue
-    setTimeout(processQueue, 1000); // Add a 1-second delay between processing items
-}
-
-async function uploadChunk(imagePath, chunkIndex, totalChunks, chunk) {
-    const reader = new FileReader();
-    reader.readAsDataURL(chunk);
-    
-    return new Promise((resolve, reject) => {
-        reader.onloadend = async function() {
-            const base64data = reader.result.split(',')[1];
-            
-            try {
-                const response = await fetch(`${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/images`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${IMAGE_UPLOAD_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        event_type: 'upload_image_chunk',
-                        client_payload: {
-                            image_path: `${GITHUB_IMAGE_FOLDER}/${imagePath}`,
-                            chunk_index: chunkIndex,
-                            total_chunks: totalChunks,
-                            chunk_content: base64data
-                        }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`GitHub API error: ${response.status}`);
-                }
-                
-                resolve();
-            } catch (error) {
-                reject(error);
-            }
-        };
-    });
 }
 
 
@@ -269,7 +197,7 @@ async function getMostRecentImageFromFolder(folderPath, limit = 5) {
         for (const image of recentImages) {
             const fullSizeImageBlob = await getFullSizeImageBlob(image.path_lower);
             if (fullSizeImageBlob) {
-                triggerGitHubAction(image.name, fullSizeImageBlob);
+                await commitImageToGitHub(image.name, fullSizeImageBlob);
             }
         }
 

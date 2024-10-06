@@ -13,10 +13,10 @@ jobs:
     - name: Upload image
       env:
         IMAGE_PATH: ${{ github.event.client_payload.image_path }}
-        IMAGE_DATA: ${{ github.event.client_payload.image_data }}
+        IMAGE_CONTENT: ${{ github.event.client_payload.image_content }}
         IMAGE_UPLOAD_TOKEN: ${{ secrets.IMAGE_UPLOAD_TOKEN }}
       run: |
-        echo $IMAGE_DATA | base64 --decode > "$IMAGE_PATH"
+        echo $IMAGE_CONTENT | base64 --decode > "$IMAGE_PATH"
         git config user.name github-actions
         git config user.email github-actions@github.com
         git add "$IMAGE_PATH"
