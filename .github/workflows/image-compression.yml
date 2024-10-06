@@ -1,69 +1,76 @@
-name: Compress and Deploy Images
+name: Refresh Token, Compress, and Upload Images
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'images/**/*'  # Trigger on image file changes
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Runs every day at midnight. Adjust as needed.
 
 jobs:
-  compress-images:
+  refresh-download-compress-commit:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Install Dropbox CLI and Dependencies
-      run: sudo apt-get install -y curl jq
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
 
-    - name: Install ImageMagick for image compression
-      run: sudo apt-get install imagemagick -y
+      # Install Dropbox CLI and Python dependencies
+      - name: Install Dropbox CLI and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip imagemagick
+          pip3 install dropbox-cli
 
-    # Step 1: Refresh Dropbox Access Token
-    - name: Refresh Dropbox Access Token
-      id: refresh_token_step
-      run: |
-        TOKEN_REFRESH_URL="https://api.dropboxapi.com/oauth2/token"
-        CLIENT_ID="${{ secrets.DROPBOX_CLIENT_ID }}"
-        CLIENT_SECRET="${{ secrets.DROPBOX_CLIENT_SECRET }}"
-        REFRESH_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
-        
-        # Fetch a new access token using the refresh token
-        ACCESS_TOKEN_RESPONSE=$(curl -X POST "$TOKEN_REFRESH_URL" \
-          --header "Content-Type: application/x-www-form-urlencoded" \
-          --data-urlencode "grant_type=refresh_token" \
-          --data-urlencode "refresh_token=$REFRESH_TOKEN" \
-          --data-urlencode "client_id=$CLIENT_ID" \
-          --data-urlencode "client_secret=$CLIENT_SECRET")
+      # Refresh Dropbox Access Token
+      - name: Refresh Dropbox Access Token
+        id: refresh_token
+        env:
+          CLIENT_ID: ${{ secrets.DROPBOX_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.DROPBOX_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+        run: |
+          response=$(curl -X POST https://api.dropboxapi.com/oauth2/token \
+            --data "grant_type=refresh_token&refresh_token=$REFRESH_TOKEN&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET" \
+            -H "Content-Type: application/x-www-form-urlencoded")
+          
+          ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
+          echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-        # Extract the access token from the response
-        ACCESS_TOKEN=$(echo "$ACCESS_TOKEN_RESPONSE" | jq -r .access_token)
+      # Download images from any folder in Dropbox using refreshed access token
+      - name: Download images from Dropbox
+        env:
+          ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
+        run: |
+          mkdir -p downloaded_images
+          python3 -c "import dropbox; \
+          dbx = dropbox.Dropbox('${{ steps.refresh_token.outputs.access_token }}'); \
+          folder_path = '';  # Root folder of Dropbox \
+          result = dbx.files_list_folder(folder_path, recursive=True); \
+          for entry in result.entries: \
+              if isinstance(entry, dropbox.files.FileMetadata) and entry.name.lower().endswith(('.jpg', '.jpeg', '.png')): \
+                  metadata, res = dbx.files_download(entry.path_lower); \
+                  with open(f'downloaded_images/{entry.name}', 'wb') as f: \
+                      f.write(res.content);"
 
-        # Output the access token for use in later steps
-        echo "ACCESS_TOKEN=$ACCESS_TOKEN" >> $GITHUB_ENV
+      # Compress images using ImageMagick
+      - name: Compress images
+        run: |
+          mkdir -p compressed_images
+          for img in downloaded_images/*; do
+            mogrify -path compressed_images -resize 50% "$img"
+          done
 
-    # Step 2: Fetch Images from Dropbox and Compress
-    - name: Fetch images from Dropbox and compress
-      run: |
-        # Use the access token from the previous step
-        ACCESS_TOKEN="${{ env.ACCESS_TOKEN }}"
-
-        # Fetch and compress the images
-        curl -X POST https://content.dropboxapi.com/2/files/download \
-          --header "Authorization: Bearer $ACCESS_TOKEN" \
-          --header "Dropbox-API-Arg: {\"path\": \"/your-dropbox-folder/full-quality-image.jpg\"}" \
-          --output ./images/full-quality-image.jpg
-
-        # Compress the image
-        mogrify -resize 1920x1080 -quality 85 ./images/full-quality-image.jpg
-
-    # Step 3: Commit and Push Compressed Images
-    - name: Commit and push compressed images
-      run: |
-        git config --global user.name 'github-actions[bot]'
-        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        git add images/
-        git commit -m 'Add compressed images'
-        git push
+      # Commit and push compressed images
+      - name: Commit and push compressed images
+        run: |
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add compressed_images/
+          git commit -m "Add compressed images"
+          git push origin main
