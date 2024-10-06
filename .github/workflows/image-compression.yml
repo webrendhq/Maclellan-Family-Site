@@ -20,12 +20,11 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Install Python, ImageMagick, and Dropbox CLI
+      # Step 3: Install Python and ImageMagick
       - name: Install Python and ImageMagick
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip imagemagick
-          pip3 install dropbox-cli
 
       # Step 4: Refresh Dropbox Access Token
       - name: Refresh Dropbox Access Token
@@ -42,24 +41,27 @@ jobs:
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      # Step 5: Download images from Dropbox using the refreshed access token
+      # Step 5: Download images from Dropbox using curl
       - name: Download images from Dropbox
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
           mkdir -p downloaded_images
-          python3 -c "import dropbox; \
-          dbx = dropbox.Dropbox('${{ steps.refresh_token.outputs.access_token }}'); \
-          folder_path = '';  # Root folder of Dropbox \
-          result = dbx.files_list_folder(folder_path, recursive=True); \
-          for entry in result.entries: \
-              if isinstance(entry, dropbox.files.FileMetadata) and entry.name.lower().endswith(('.jpg', '.jpeg', '.png')): \
-                  metadata, res = dbx.files_download(entry.path_lower); \
-                  with open(f'downloaded_images/{entry.name}', 'wb') as f: \
-                      f.write(res.content); \
-                  print(f'Downloaded {entry.name}')"
+          curl -X POST https://api.dropboxapi.com/2/files/list_folder \
+            --header "Authorization: Bearer $ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data "{\"path\": \"\", \"recursive\": true}" \
+            | jq '.entries[] | select(.\".tag\" == "file") | .path_lower' \
+            | while read -r path; do
+              path=${path//\"/}  # Remove double quotes
+              filename=$(basename "$path")
+              curl -X POST https://content.dropboxapi.com/2/files/download \
+                --header "Authorization: Bearer $ACCESS_TOKEN" \
+                --header "Dropbox-API-Arg: {\"path\": \"$path\"}" \
+                -o "downloaded_images/$filename"
+            done
 
-      # Step 6: Compress images using ImageMagick with correct paths
+      # Step 6: Compress images using ImageMagick
       - name: Compress images
         run: |
           mkdir -p compressed_images
