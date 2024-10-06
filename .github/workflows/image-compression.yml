@@ -51,11 +51,11 @@ jobs:
           response=$(curl -X POST https://api.dropboxapi.com/2/files/list_folder \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "{\"path\": \"/Kevin\", \"recursive\": true}")  # Set your path here (e.g., /Kevin)
+            --data "{\"path\": \"\", \"recursive\": true}")
           
           echo "Dropbox response: $response"  # Debug response from Dropbox
           
-          echo "$response" | jq -r '.entries[] | select(.[".tag"] == "file") | .path_lower' \
+          echo "$response" | jq -r '.entries[] | select(.[".tag"] == "file" and (.name | test("\\.(jpg|jpeg|png|gif|heic)$"))) | .path_lower' \
           | while read -r path; do
               filename=$(basename "$path")
               echo "Downloading file $filename from Dropbox..."
