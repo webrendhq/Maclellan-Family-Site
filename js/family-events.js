@@ -19,7 +19,7 @@ async function triggerGitHubAction(imagePath, imageBlob) {
         const base64 = await blobToBase64(imageBlob);
         
         // Trigger GitHub Action workflow without authentication
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`, {
+        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/images`, {
             method: 'POST',
             headers: {
                 'Accept': 'application/vnd.github.v3+json',
@@ -93,7 +93,7 @@ async function uploadChunk(imagePath, chunkIndex, totalChunks, chunk) {
             const base64data = reader.result.split(',')[1];
             
             try {
-                const response = await fetch(`${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`, {
+                const response = await fetch(`${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/images`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `token ${IMAGE_UPLOAD_TOKEN}`,
