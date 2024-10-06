@@ -1,10 +1,6 @@
 name: Refresh Token, Compress, and Upload Images & Video Thumbnails Incrementally
 
 on:
-  schedule:
-    # Run this workflow every 15 minutes to check for new media in Dropbox
-    - cron: "*/15 * * * *"
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions
   push:
     branches:
       - main
@@ -45,15 +41,15 @@ jobs:
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      # Step 5: Search for and process new images incrementally
-      - name: Search and process new images incrementally
+      # Step 5: Search for and process images incrementally
+      - name: Search and process images incrementally
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          mkdir -p downloaded_images processed_images_cache
-          echo "Searching for new image files in Dropbox..."
+          mkdir -p downloaded_images
+          echo "Searching for all image files in Dropbox..."
 
-          # Search for new image files
+          # Search for files with image extensions recursively
           response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
@@ -66,18 +62,9 @@ jobs:
               }
             }')
 
-          # Process each image file
+          # Process each image one by one
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
-              filename=$(basename "$path")
-
-              # Check if the image has already been processed
-              if [ -f "processed_images_cache/$filename" ]; then
-                echo "Skipping already processed image: $filename"
-                continue
-              fi
-
-              # Download the image if not processed
               echo "Generating temporary link for $path..."
               temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
@@ -86,6 +73,7 @@ jobs:
               temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
               if [ "$temp_link" != "null" ]; then
+                filename=$(basename "$path")
                 echo "Downloading $filename from $temp_link"
                 curl -L "$temp_link" -o "downloaded_images/$filename"
 
@@ -95,12 +83,11 @@ jobs:
                 mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
 
                 # Commit and push the compressed image
-                git add compressed_images/$filename
+                git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                git config --global user.name "github-actions[bot]"
+                git add compressed_images/$filename || echo "No matching files"
                 git commit -m "Add compressed image: $filename" || echo "No changes to commit"
                 git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-
-                # Mark the image as processed
-                touch "processed_images_cache/$filename"
 
                 # Remove the original downloaded image to save space
                 rm "downloaded_images/$filename"
@@ -109,15 +96,15 @@ jobs:
               fi
           done
 
-      # Step 6: Search for and process new video thumbnails incrementally
-      - name: Search and process new video thumbnails incrementally
+      # Step 6: Search for and process video thumbnails incrementally (saved to compressed_video_thumbnails)
+      - name: Search and process video thumbnails incrementally
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          mkdir -p downloaded_video_thumbnails processed_video_cache
-          echo "Searching for new video files in Dropbox..."
+          mkdir -p downloaded_video_thumbnails
+          echo "Searching for all video files in Dropbox..."
 
-          # Search for new video files
+          # Search for files with video extensions recursively
           response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
@@ -130,18 +117,9 @@ jobs:
               }
             }')
 
-          # Process each video file for thumbnail extraction
+          # Process each video one by one to extract thumbnails
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
-              filename=$(basename "$path" .mp4).jpg
-
-              # Check if the video has already been processed
-              if [ -f "processed_video_cache/$filename" ]; then
-                echo "Skipping already processed video: $filename"
-                continue
-              fi
-
-              # Download video thumbnail if not processed
               echo "Generating temporary link for $path..."
               temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
@@ -150,7 +128,10 @@ jobs:
               temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
               if [ "$temp_link" != "null" ]; then
+                filename=$(basename "$path" .mp4).jpg  # Create a jpg thumbnail filename based on video name
                 echo "Generating thumbnail for $path..."
+
+                # Use ffmpeg to extract the thumbnail from the temporary video link
                 ffmpeg -i "$temp_link" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$filename"
 
                 # Compress the thumbnail
@@ -159,12 +140,11 @@ jobs:
                 mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$filename" || echo "Error compressing thumbnail $filename"
 
                 # Commit and push the compressed thumbnail
-                git add compressed_video_thumbnails/$filename
+                git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                git config --global user.name "github-actions[bot]"
+                git add compressed_video_thumbnails/$filename || echo "No matching files"
                 git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
                 git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-
-                # Mark the video as processed
-                touch "processed_video_cache/$filename"
 
                 # Remove the original downloaded thumbnail to save space
                 rm "downloaded_video_thumbnails/$filename"
@@ -173,7 +153,7 @@ jobs:
               fi
           done
 
-      # Debug Step: Check if media were downloaded and compressed
+      # Debug Step: Check if images and thumbnails were downloaded and compressed
       - name: List downloaded and compressed media
         run: |
           echo "Downloaded Images:"
