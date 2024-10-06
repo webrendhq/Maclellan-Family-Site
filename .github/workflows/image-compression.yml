@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Install Python and ImageMagick
+      # Step 3: Install Python, ImageMagick, and jq
       - name: Install Python and ImageMagick
         run: |
           sudo apt-get update
@@ -41,8 +41,8 @@ jobs:
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      # Step 5: Download images from Dropbox using curl and debug response
-      - name: Download images from Dropbox
+      # Step 5: List all images in Dropbox and download them using temporary links
+      - name: Download images from Dropbox using temporary links
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
@@ -53,18 +53,26 @@ jobs:
             --header "Content-Type: application/json" \
             --data "{\"path\": \"\", \"recursive\": true}")
           
-          echo "Dropbox response: $response"  # Debug response from Dropbox
-          
+          # Filter image files and use get_temporary_link to download
           echo "$response" | jq -r '.entries[] | select(.[".tag"] == "file" and (.name | test("\\.(jpg|jpeg|png|gif|heic)$"))) | .path_lower' \
           | while read -r path; do
-              filename=$(basename "$path")
-              echo "Downloading file $filename from Dropbox..."
-              curl -X POST https://content.dropboxapi.com/2/files/download \
+              echo "Generating temporary link for $path..."
+              temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
-                --header "Dropbox-API-Arg: {\"path\": \"$path\"}" \
-                -o "downloaded_images/$filename"
+                --header "Content-Type: application/json" \
+                --data "{\"path\": \"$path\"}")
+              temp_link=$(echo "$temp_link_response" | jq -r '.link')
+              
+              # Download the image using the temporary link
+              if [ "$temp_link" != "null" ]; then
+                filename=$(basename "$path")
+                echo "Downloading $filename from $temp_link"
+                curl -L "$temp_link" -o "downloaded_images/$filename"
+              else
+                echo "Failed to get temporary link for $path"
+              fi
           done
-      
+
       # Debug Step: Check if images were downloaded
       - name: List downloaded images
         run: ls -l downloaded_images
