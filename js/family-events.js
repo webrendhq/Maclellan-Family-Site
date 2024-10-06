@@ -2,57 +2,14 @@
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
-const GITHUB_API_URL = 'https://api.github.com';
-const GITHUB_REPO_OWNER = 'kevinveragit';
-const GITHUB_REPO_NAME = 'Maclellan-Frontend';
-const GITHUB_IMAGE_FOLDER = 'images';
-const GITHUB_RAW_CONTENT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/main/${GITHUB_IMAGE_FOLDER}`;
-
-// Base64 encoded GitHub token
-const ENCODED_GITHUB_TOKEN = 'Z2l0aHViX3BhdF8xMUJHSkJPTUkwbHdBU1d5ODRFY1lVX0JpM0JTMnF0RzZyeXFrVnM3UE12ZWlaNG1KY0dvZ1FmekVjYVNVbmxySnpLNjdaWlJaV2JRUmNaVDNp';
-
-// Function to decode and get the GitHub token
-function getGitHubToken() {
-    return atob(ENCODED_GITHUB_TOKEN);
-}
-
-async function getGitHubImageUrl(imageName) {
-    try {
-        const response = await fetch(`${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${GITHUB_IMAGE_FOLDER}/${imageName}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `token ${getGitHubToken()}`
-            }
-        });
-
-        if (response.status === 200) {
-            return `${GITHUB_RAW_CONTENT_URL}/${imageName}`;
-        }
-        return null;
-    } catch (error) {
-        console.error('Error checking GitHub for image:', error);
-        return null;
-    }
-}
-
+// Ensure user is authenticated
 onAuthStateChanged(auth, (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
         window.location.href = '/sign-in.html';
     }
-    // If a user is signed in, do nothing and allow access to the current page.
 });
 
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-  
 // Function to get URL parameters
 function getUrlParameter(name) {
     name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
@@ -63,187 +20,14 @@ function getUrlParameter(name) {
 
 const year = getUrlParameter('year');
 
-async function getFullSizeImageBlob(path) {
-    try {
-        const response = await fetch('https://content.dropboxapi.com/2/files/download', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Dropbox-API-Arg': JSON.stringify({
-                    path: path
-                })
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Dropbox API error: ${response.status}`);
-        }
-
-        return await response.blob();
-    } catch (error) {
-        console.error('Error fetching full-size image from Dropbox:', error);
-        return null;
-    }
+// Function to construct the URL for the compressed image
+async function getCompressedImageUrl(path) {
+    // Replace this with your GitHub Pages URL or wherever the images are hosted
+    const compressedImageUrl = `https://your-github-username.github.io/your-repo-name/compressed-images/${encodeURIComponent(path)}`;
+    return compressedImageUrl;
 }
 
-async function checkImageExistsInGitHub(imageName) {
-    try {
-        const response = await fetch(`${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${GITHUB_IMAGE_FOLDER}/${imageName}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `token ${getGitHubToken()}`
-            }
-        });
-        return response.status === 200;
-    } catch (error) {
-        console.error('Error checking GitHub for image:', error);
-        return false;
-    }
-}
-
-async function getDropboxTemporaryLink(path) {
-    try {
-        const response = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ path })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Dropbox API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data.link;
-    } catch (error) {
-        console.error('Error fetching Dropbox image URL:', error);
-        return null;
-    }
-}
-
-async function getImageUrl(dropboxPaths) {
-    // Ensure dropboxPaths is an array
-    if (!Array.isArray(dropboxPaths)) {
-        console.error("dropboxPaths is not an array.");
-        return;
-    }
-
-    const imageUrls = await Promise.all(dropboxPaths.map(async (dropboxPath) => {
-        const imageName = dropboxPath.split('/').pop();
-
-        // Step 1: Check if the image already exists in GitHub
-        if (await checkImageExistsInGitHub(imageName)) {
-            console.log(`Image found in GitHub: ${imageName}`);
-            return `../images/${imageName}`;
-        }
-
-        // Step 2: Fetch the high-quality image from Dropbox
-        console.log(`Image not found in GitHub, fetching from Dropbox: ${imageName}`);
-        const dropboxUrl = await getDropboxTemporaryLink(dropboxPath);
-        
-        if (!dropboxUrl) {
-            console.error('Failed to get Dropbox temporary link.');
-            return null;
-        }
-
-        // Step 3: Download the image and commit to GitHub
-        const imageResponse = await fetch(dropboxUrl);
-        const imageBlob = await imageResponse.blob();
-        await commitImageToGitHub(imageName, imageBlob);
-
-        return `../images/${imageName}`;  // Return the relative GitHub image URL
-    }));
-
-    return imageUrls;
-}
-
-async function commitImageToGitHub(imageName, imageBlob) {
-    try {
-        const base64 = await blobToBase64(imageBlob);
-
-        // Correct API endpoint for committing files to the 'images' folder
-        const apiUrl = `${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/contents/${GITHUB_IMAGE_FOLDER}/${imageName}`;
-
-        const response = await fetch(apiUrl, {
-            method: 'PUT',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json',
-                'Authorization': `token ${getGitHubToken()}`
-            },
-            body: JSON.stringify({
-                message: `Upload image: ${imageName}`,
-                content: base64.split(',')[1],  // Use base64 encoded image without the prefix
-                branch: 'main'
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`GitHub API error: ${response.status}. Message: ${errorData.message}`);
-        }
-
-        console.log(`Uploaded image to GitHub: ${imageName}`);
-    } catch (error) {
-        console.error('Error uploading image to GitHub:', error);
-    }
-}
-
-// Modified getThumbnailBlob to always use 'w64h64' and implement caching
-async function getThumbnailBlob(path) {
-    const size = 'w128h128';
-    const cacheKey = `${path}_${size}`;
-    const cache = await caches.open('thumbnails-cache');
-
-    const cachedResponse = await cache.match(cacheKey);
-    if (cachedResponse) {
-        return await cachedResponse.blob();
-    }
-
-    try {
-        const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Dropbox-API-Arg': JSON.stringify({
-                    path: path,
-                    format: 'jpeg',
-                    size: size
-                })
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const responseClone = response.clone();
-        cache.put(cacheKey, responseClone);
-
-        return await response.blob();
-    } catch (error) {
-        console.error('Error fetching thumbnail:', error);
-        return null;
-    }
-}
-
-// Function to create object URL for the thumbnail
-async function getThumbnail(path) {
-    const blob = await getThumbnailBlob(path);
-    if (blob) {
-        const url = URL.createObjectURL(blob);
-        return url;
-    } else {
-        console.error(`Failed to fetch thumbnail for path ${path}`);
-        return null;
-    }
-}
-
-// Function to get the most recent image from a folder and its thumbnail
+// Function to get the most recent image from a folder and construct the compressed image URL
 async function getMostRecentImageFromFolder(folderPath) {
     try {
         const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
@@ -264,11 +48,12 @@ async function getMostRecentImageFromFolder(folderPath) {
         });
 
         if (!response.ok) {
-            throw new Error(`Dropbox API error: ${response.status}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
 
+        // Filter files that are images based on media_info or file extensions
         const imageFiles = data.entries.filter(entry =>
             entry['.tag'] === 'file' &&
             (
@@ -279,17 +64,20 @@ async function getMostRecentImageFromFolder(folderPath) {
 
         if (imageFiles.length === 0) return null;
 
+        // Sort by client_modified date if available, otherwise use server_modified
         imageFiles.sort((a, b) => {
             const dateA = new Date(a.client_modified || a.server_modified);
             const dateB = new Date(b.client_modified || b.server_modified);
-            return dateB - dateA;
+            return dateB - dateA; // Most recent first
         });
 
         const mostRecentImage = imageFiles[0];
-        const imageUrl = await getImageUrl([mostRecentImage.path_lower]);
+
+        // Get the compressed image URL
+        const compressedImageUrl = await getCompressedImageUrl(mostRecentImage.name);
 
         return {
-            thumbnail: imageUrl,
+            compressed: compressedImageUrl,
             imagePath: mostRecentImage.path_lower
         };
     } catch (error) {
@@ -375,27 +163,39 @@ async function listExactYearFolders() {
                 for (const item of folderContents.entries) {
                     if (item['.tag'] === 'folder') {
                         const imageData = await getMostRecentImageFromFolder(item.path_lower);
-                        if (imageData && imageData.thumbnail) {
+                        if (imageData && imageData.compressed) {
+                            // Create an 'a' element
                             const folderLink = document.createElement('a');
                             folderLink.className = 'folder-item';
+
+                            // Set the href attribute to include year and path
                             const encodedPath = encodeURIComponent(item.path_lower);
-                            folderLink.href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedPath}`;
-        
+                            const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedPath}`;
+                            folderLink.href = href;
+
+                            // Create an img element
                             const img = document.createElement('img');
                             img.alt = item.name;
-                            img.loading = 'lazy';
+                            img.loading = 'lazy'; // Implement lazy loading
+
+                            // Set the styles for responsive image display
                             img.style.width = '100%';
                             img.style.height = 'auto';
                             img.style.objectFit = 'cover';
                             img.style.borderRadius = '4px';
-                            img.src = imageData.thumbnail;
-        
+
+                            // Set the src attribute to the compressed image URL
+                            img.src = imageData.compressed;
+
+                            // Append the image to the folder link
                             folderLink.appendChild(img);
-        
+
+                            // Optionally, add a caption
                             const caption = document.createElement('p');
                             caption.textContent = item.name;
                             folderLink.appendChild(caption);
-        
+
+                            // Append the folder link to the grid
                             eventBentoGrid.appendChild(folderLink);
                         } else {
                             console.log(`Folder skipped (no images): ${item.path_display}`);
@@ -440,11 +240,5 @@ async function listExactYearFolders() {
         }
     }
 }
-
-// Example of initializing dropboxPaths and calling the getImageUrl function
-const dropboxPaths = ['/path/to/file1.jpg', '/path/to/file2.jpg']; // Initialize with the correct paths
-getImageUrl(dropboxPaths).then((urls) => {
-    console.log('Processed image URLs:', urls);
-});
 
 listExactYearFolders();

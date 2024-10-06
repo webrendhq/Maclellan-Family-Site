@@ -1,0 +1,128 @@
+name: Compress and Deploy Most Recent Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 'Year to select folders from'
+        required: true
+        default: '2024'
+
+jobs:
+  compress-images:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Dropbox CLI and Dependencies
+      run: sudo apt-get install -y curl jq
+
+    - name: Install ImageMagick for image compression
+      run: sudo apt-get install imagemagick -y
+
+    # Step: Refresh Dropbox Access Token
+    - name: Refresh Dropbox Access Token
+      id: refresh_token_step
+      run: |
+        TOKEN_REFRESH_URL="https://api.dropboxapi.com/oauth2/token"
+        CLIENT_ID="${{ secrets.DROPBOX_CLIENT_ID }}"
+        CLIENT_SECRET="${{ secrets.DROPBOX_CLIENT_SECRET }}"
+        REFRESH_TOKEN="${{ secrets.DROPBOX_REFRESH_TOKEN }}"
+
+        # Request a new access token using the refresh token
+        ACCESS_TOKEN_RESPONSE=$(curl -s -X POST "$TOKEN_REFRESH_URL" \
+          --header "Content-Type: application/x-www-form-urlencoded" \
+          --data-urlencode "grant_type=refresh_token" \
+          --data-urlencode "refresh_token=$REFRESH_TOKEN" \
+          --data-urlencode "client_id=$CLIENT_ID" \
+          --data-urlencode "client_secret=$CLIENT_SECRET")
+
+        # Extract the access token from the response
+        ACCESS_TOKEN=$(echo "$ACCESS_TOKEN_RESPONSE" | jq -r .access_token)
+
+        # Check if we successfully obtained an access token
+        if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+          echo "Failed to refresh Dropbox access token."
+          exit 1
+        fi
+
+        # Set the access token as an environment variable for later steps
+        echo "ACCESS_TOKEN=$ACCESS_TOKEN" >> $GITHUB_ENV
+
+    # Step: Fetch and compress the most recent images from Dropbox
+    - name: Fetch and compress the most recent images
+      run: |
+        # Use the access token from the previous step
+        DROPBOX_ACCESS_TOKEN="${{ env.ACCESS_TOKEN }}"
+
+        # Get the year from the workflow input
+        YEAR="${{ github.event.inputs.year }}"
+
+        # 1. Fetch all folders matching the exact year
+        echo "Fetching folders for year ${YEAR}..."
+
+        SEARCH_RESPONSE=$(curl -s -X POST https://api.dropboxapi.com/2/files/search_v2 \
+        --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
+        --header "Content-Type: application/json" \
+        --data "{\"query\": \"${YEAR}\", \"options\": {\"path\": \"\", \"filename_only\": true}}")
+
+        # 2. Filter for exact folder matches with the year
+        FOLDERS=$(echo "${SEARCH_RESPONSE}" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "folder" and .metadata.metadata.name == "'"${YEAR}"'") | .metadata.metadata.path_lower')
+
+        if [ -z "$FOLDERS" ]; then
+          echo "No folders found for the year ${YEAR}"
+          exit 1
+        fi
+
+        echo "Found folders: ${FOLDERS}"
+
+        # Create compressed-images directory
+        mkdir -p compressed-images
+
+        # Loop through each folder and fetch the most recent image
+        for folder in ${FOLDERS}; do
+          echo "Processing folder: $folder"
+
+          # 3. Fetch the list of files in the folder
+          LIST_RESPONSE=$(curl -s -X POST https://api.dropboxapi.com/2/files/list_folder \
+          --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
+          --header "Content-Type: application/json" \
+          --data "{\"path\": \"${folder}\", \"recursive\": false, \"include_media_info\": true}")
+
+          # 4. Find the most recent image in the folder
+          MOST_RECENT_IMAGE=$(echo "${LIST_RESPONSE}" | jq -r '.entries[] | select(.[".tag"] == "file" and (.media_info[".tag"] == "photo" or (.name | test(".(jpg|jpeg|png|gif|heic)$"; "i")))) | .path_lower' | head -n 1)
+
+          if [ -n "${MOST_RECENT_IMAGE}" ]; then
+            echo "Most recent image: ${MOST_RECENT_IMAGE}"
+
+            # 5. Download the most recent image
+            IMAGE_NAME=$(basename "${MOST_RECENT_IMAGE}")
+            curl -X POST https://content.dropboxapi.com/2/files/download \
+              --header "Authorization: Bearer ${DROPBOX_ACCESS_TOKEN}" \
+              --header "Dropbox-API-Arg: {\"path\": \"${MOST_RECENT_IMAGE}\"}" \
+              --output "./images/${IMAGE_NAME}"
+
+            # 6. Compress the image
+            mogrify -resize 1920x1080 -quality 85 -path ./compressed-images/ ./images/${IMAGE_NAME}
+          else
+            echo "No images found in folder: ${folder}"
+          fi
+        done
+
+    # Step: Commit and push compressed images
+    - name: Commit and push compressed images
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        git add compressed-images/
+        git commit -m 'Add compressed images for year ${YEAR}'
+        git push
+
+    # Step: Deploy to GitHub Pages (optional)
+    - name: Deploy to GitHub Pages (optional)
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./compressed-images/
