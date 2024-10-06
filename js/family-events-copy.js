@@ -10,7 +10,7 @@ onAuthStateChanged(auth, (user) => {
     // If a user is signed in, do nothing and allow access to the current page.
 });
 
-
+  
 // Function to get URL parameters
 function getUrlParameter(name) {
     name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
