@@ -41,32 +41,41 @@ jobs:
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      # Step 5: Download images from Dropbox using temporary links (with added debug)
-      - name: Download images from Dropbox using temporary links
+      # Step 5: Search for every image in Dropbox using Search v2 API
+      - name: Search and download all images from Dropbox
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
           mkdir -p downloaded_images
-          echo "Listing files from Dropbox..."
-          response=$(curl -X POST https://api.dropboxapi.com/2/files/list_folder \
+          echo "Searching for all image files in Dropbox..."
+
+          # Search for files with specific extensions recursively
+          response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "{\"path\": \"\", \"recursive\": true}")
-          
-          echo "Full Dropbox API Response: $response"  # Full API response for debugging
-          
-          # Filter image files and use get_temporary_link to download
-          echo "$response" | jq -r '.entries[] | select(.[".tag"] == "file" and (.name | test("\\.(jpg|jpeg|png|gif|heic)$"))) | .path_lower' \
+            --data '{
+              "query": ".jpg OR .jpeg OR .png OR .gif OR .heic",
+              "options": {
+                "filename_only": true,
+                "file_status": "active",
+                "max_results": 1000
+              }
+            }')
+
+          echo "Full Dropbox API Search Response: $response"
+
+          # Filter search results to get only image files and use get_temporary_link to download
+          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
               echo "Generating temporary link for $path..."
               temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
                 --header "Content-Type: application/json" \
                 --data "{\"path\": \"$path\"}")
-              echo "Temporary link response: $temp_link_response"  # Added to debug temporary link creation
+              echo "Temporary link response: $temp_link_response"
               
               temp_link=$(echo "$temp_link_response" | jq -r '.link')
-              
+
               # Download the image using the temporary link
               if [ "$temp_link" != "null" ]; then
                 filename=$(basename "$path")
