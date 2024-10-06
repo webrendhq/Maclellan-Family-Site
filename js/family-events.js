@@ -13,17 +13,17 @@ onAuthStateChanged(auth, (user) => {
 // Function to get URL parameters
 function getUrlParameter(name) {
     name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
-    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    var results = regex.exec(window.location.search);
+    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    const results = regex.exec(window.location.search);
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
 const year = getUrlParameter('year');
 
-// Function to construct the URL for the compressed image
+// Function to construct the relative URL for the compressed image
 async function getCompressedImageUrl(path) {
-    // Replace this with your GitHub Pages URL or wherever the images are hosted
-    const compressedImageUrl = `https://kevinveragit.github.io/Maclellan-Frontend/compressed-images/${encodeURIComponent(path)}`;
+    // Use a relative path to access the images from the compressed-images folder
+    const compressedImageUrl = `../compressed-images/${encodeURIComponent(path)}`;
     return compressedImageUrl;
 }
 
@@ -73,7 +73,7 @@ async function getMostRecentImageFromFolder(folderPath) {
 
         const mostRecentImage = imageFiles[0];
 
-        // Get the compressed image URL
+        // Get the compressed image URL using relative path
         const compressedImageUrl = await getCompressedImageUrl(mostRecentImage.name);
 
         return {
@@ -184,7 +184,7 @@ async function listExactYearFolders() {
                             img.style.objectFit = 'cover';
                             img.style.borderRadius = '4px';
 
-                            // Set the src attribute to the compressed image URL
+                            // Set the src attribute to the compressed image URL (relative path)
                             img.src = imageData.compressed;
 
                             // Append the image to the folder link
