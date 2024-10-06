@@ -6,7 +6,7 @@ import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us
 // GitHub configuration
 const GITHUB_API_URL = 'https://api.github.com';
 const GITHUB_REPO_OWNER = 'kevinveragit';
-const GITHUB_REPO_NAME = 'Maclellen-Frontend';
+const GITHUB_REPO_NAME = 'Maclellan-Frontend';
 const GITHUB_IMAGE_FOLDER = 'images';
   
 // Function to trigger GitHub Action for image upload
