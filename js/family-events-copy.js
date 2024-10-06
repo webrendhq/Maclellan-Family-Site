@@ -1,130 +1,7 @@
+
 // Import necessary functions and tokens
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
-
-
-// GitHub configuration
-const GITHUB_API_URL = 'https://api.github.com';
-const GITHUB_REPO_OWNER = 'kevinveragit';
-const GITHUB_REPO_NAME = 'Maclellen-Frontend';
-const GITHUB_IMAGE_FOLDER = 'images';
-
-// Function to trigger GitHub Action for image upload
-const queue = [];
-let isProcessing = false;
-
-// Modified triggerGitHubAction function
-async function triggerGitHubAction(imagePath, imageBlob) {
-    try {
-        const base64 = await blobToBase64(imageBlob);
-        
-        // Trigger GitHub Action workflow without authentication
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                event_type: 'upload_image',
-                client_payload: {
-                    image_path: `${GITHUB_IMAGE_FOLDER}/${imagePath}`,
-                    image_data: base64
-                }
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`GitHub API error: ${response.status}`);
-        }
-
-        console.log(`Triggered GitHub Action for image: ${imagePath}`);
-    } catch (error) {
-        console.error('Error triggering GitHub Action:', error);
-    }
-}
-
-// Helper function to convert Blob to base64 (remains unchanged)
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function processQueue() {
-    if (queue.length === 0) {
-        isProcessing = false;
-        return;
-    }
-    
-    isProcessing = true;
-    const { imagePath, imageBlob } = queue.shift();
-    
-    try {
-        const chunkSize = 1024 * 1024; // 1MB chunks
-        const totalChunks = Math.ceil(imageBlob.size / chunkSize);
-        
-        for (let i = 0; i < totalChunks; i++) {
-            const start = i * chunkSize;
-            const end = Math.min(start + chunkSize, imageBlob.size);
-            const chunk = imageBlob.slice(start, end);
-            
-            await uploadChunk(imagePath, i, totalChunks, chunk);
-        }
-        
-        console.log(`Uploaded image: ${imagePath}`);
-    } catch (error) {
-        console.error('Error uploading image:', error);
-    }
-    
-    // Process next item in the queue
-    setTimeout(processQueue, 1000); // Add a 1-second delay between processing items
-}
-
-async function uploadChunk(imagePath, chunkIndex, totalChunks, chunk) {
-    const reader = new FileReader();
-    reader.readAsDataURL(chunk);
-    
-    return new Promise((resolve, reject) => {
-        reader.onloadend = async function() {
-            const base64data = reader.result.split(',')[1];
-            
-            try {
-                const response = await fetch(`${GITHUB_API_URL}/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/dispatches`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${IMAGE_UPLOAD_TOKEN}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        event_type: 'upload_image_chunk',
-                        client_payload: {
-                            image_path: `${GITHUB_IMAGE_FOLDER}/${imagePath}`,
-                            chunk_index: chunkIndex,
-                            total_chunks: totalChunks,
-                            chunk_content: base64data
-                        }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`GitHub API error: ${response.status}`);
-                }
-                
-                resolve();
-            } catch (error) {
-                reject(error);
-            }
-        };
-    });
-}
-
-
-
 onAuthStateChanged(auth, (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
@@ -144,17 +21,19 @@ function getUrlParameter(name) {
 
 const year = getUrlParameter('year');
 
-// Modified getThumbnailBlob to always use 'w128h128' and implement caching
+// Modified getThumbnailBlob to always use 'w64h64' and implement caching
 async function getThumbnailBlob(path) {
-    const size = 'w128h128';
+    const size = 'w128h128'; // Enforce 64x64 resolution
     const cacheKey = `${path}_${size}`;
     const cache = await caches.open('thumbnails-cache');
 
+    // Check if the image is already in the cache
     const cachedResponse = await cache.match(cacheKey);
     if (cachedResponse) {
         return await cachedResponse.blob();
     }
 
+    // If not in cache, fetch the image
     try {
         const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
             method: 'POST',
@@ -163,7 +42,7 @@ async function getThumbnailBlob(path) {
                 'Dropbox-API-Arg': JSON.stringify({
                     path: path,
                     format: 'jpeg',
-                    size: size
+                    size: size // Always use 'w64h64'
                 })
             }
         });
@@ -172,36 +51,13 @@ async function getThumbnailBlob(path) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
+        // Clone the response so we can store it in the cache
         const responseClone = response.clone();
         cache.put(cacheKey, responseClone);
 
         return await response.blob();
     } catch (error) {
         console.error('Error fetching thumbnail:', error);
-        return null;
-    }
-}
-
-// Function to get the full-size image blob
-async function getFullSizeImageBlob(path) {
-    try {
-        const response = await fetch('https://content.dropboxapi.com/2/files/download', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Dropbox-API-Arg': JSON.stringify({
-                    path: path
-                })
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.blob();
-    } catch (error) {
-        console.error('Error fetching full-size image:', error);
         return null;
     }
 }
@@ -219,7 +75,7 @@ async function getThumbnail(path) {
 }
 
 // Function to get the most recent image from a folder and its thumbnail
-async function getMostRecentImageFromFolder(folderPath, limit = 5) {
+async function getMostRecentImageFromFolder(folderPath) {
     try {
         const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
             method: 'POST',
@@ -230,7 +86,7 @@ async function getMostRecentImageFromFolder(folderPath, limit = 5) {
             body: JSON.stringify({
                 path: folderPath,
                 recursive: false,
-                include_media_info: true,
+                include_media_info: true, // Enable media info
                 include_deleted: false,
                 include_has_explicit_shared_members: false,
                 include_mounted_folders: false,
@@ -244,6 +100,7 @@ async function getMostRecentImageFromFolder(folderPath, limit = 5) {
 
         const data = await response.json();
 
+        // Filter files that are images based on media_info or file extensions
         const imageFiles = data.entries.filter(entry =>
             entry['.tag'] === 'file' &&
             (
@@ -252,37 +109,26 @@ async function getMostRecentImageFromFolder(folderPath, limit = 5) {
             )
         );
 
-        if (imageFiles.length === 0) {
-            console.log(`No images found in folder: ${folderPath}`);
-            return null;
-        }
+        if (imageFiles.length === 0) return null;
 
+        // Sort by client_modified date if available, otherwise use server_modified
         imageFiles.sort((a, b) => {
             const dateA = new Date(a.client_modified || a.server_modified);
             const dateB = new Date(b.client_modified || b.server_modified);
-            return dateB - dateA;
+            return dateB - dateA; // Most recent first
         });
 
-        // Only process the most recent 'limit' number of images
-        const recentImages = imageFiles.slice(0, limit);
+        const mostRecentImage = imageFiles[0];
 
-        for (const image of recentImages) {
-            const fullSizeImageBlob = await getFullSizeImageBlob(image.path_lower);
-            if (fullSizeImageBlob) {
-                triggerGitHubAction(image.name, fullSizeImageBlob);
-            }
-        }
-
-        // Return the most recent image for thumbnail display
-        const mostRecentImage = recentImages[0];
-        const thumbnailBlob = await getThumbnailBlob(mostRecentImage.path_lower);
+        // Get the thumbnail
+        const thumbnailUrl = await getThumbnail(mostRecentImage.path_lower);
 
         return {
-            thumbnail: thumbnailBlob ? URL.createObjectURL(thumbnailBlob) : null,
+            thumbnail: thumbnailUrl,
             imagePath: mostRecentImage.path_lower
         };
     } catch (error) {
-        console.error('Error getting recent images:', error);
+        console.error('Error getting most recent image:', error);
         return null;
     }
 }
@@ -363,7 +209,7 @@ async function listExactYearFolders() {
 
                 for (const item of folderContents.entries) {
                     if (item['.tag'] === 'folder') {
-                        const imageData = await getMostRecentImageFromFolder(item.path_lower, 5);
+                        const imageData = await getMostRecentImageFromFolder(item.path_lower);
                         if (imageData && imageData.thumbnail) {
                             // Create an 'a' element
                             const folderLink = document.createElement('a');
@@ -379,7 +225,7 @@ async function listExactYearFolders() {
                             img.alt = item.name;
                             img.loading = 'lazy'; // Implement lazy loading
 
-                            // Set the styles to enforce 128x128 resolution
+                            // Set the styles to enforce 64x64 resolution
                             img.style.width = '100%';
                             img.style.height = 'auto';
                             img.style.objectFit = 'cover';
@@ -391,7 +237,7 @@ async function listExactYearFolders() {
                             // Append the image to the folder link
                             folderLink.appendChild(img);
 
-                            // Add a caption
+                            // Optionally, add a caption
                             const caption = document.createElement('p');
                             caption.textContent = item.name;
                             folderLink.appendChild(caption);
@@ -414,6 +260,11 @@ async function listExactYearFolders() {
                     columnWidth: '.folder-item',  // Use folder-item width as the column size
                     horizontalOrder: true         // Stack items vertically, filling one column before the next
                 }
+            });
+
+            // Ensure layout updates once all images are loaded
+            imagesLoaded(eventBentoGrid, function () {
+                iso.layout();
             });
 
             // Ensure layout updates once all images are loaded
@@ -444,11 +295,3 @@ async function listExactYearFolders() {
 
 
 listExactYearFolders();
-
-
-
-
-
-
-
-
