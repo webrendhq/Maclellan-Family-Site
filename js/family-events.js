@@ -9,7 +9,7 @@ const GITHUB_IMAGE_FOLDER = 'images';
 const GITHUB_RAW_CONTENT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/main/${GITHUB_IMAGE_FOLDER}`;
 
 // Base64 encoded GitHub token
-const ENCODED_GITHUB_TOKEN = 'Z2l0aHViX3BhdF8xMUJHSkJPTUkwb3oySEtZbDZPNEtiX3BDVkwxWDdpMkFkTlZvYjU4VDFkNnNRc2NZblprcWdsN3pKWnJRRFdJV3hGUEVKR0tDM2JGZ1dFWHZS';
+const ENCODED_GITHUB_TOKEN = 'Z2l0aHViX3BhdF8xMUJHSkJPTUkwbHdBU1d5ODRFY1lVX0JpM0JTMnF0RzZyeXFrVnM3UE12ZWlaNG1KY0dvZ1FmekVjYVNVbmxySnpLNjdaWlJaV2JRUmNaVDNp';
 
 // Function to decode and get the GitHub token
 function getGitHubToken() {
