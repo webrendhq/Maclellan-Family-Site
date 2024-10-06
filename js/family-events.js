@@ -23,7 +23,7 @@ const year = getUrlParameter('year');
 // Function to construct the URL for the compressed image
 async function getCompressedImageUrl(path) {
     // Replace this with your GitHub Pages URL or wherever the images are hosted
-    const compressedImageUrl = `https://your-github-username.github.io/your-repo-name/compressed-images/${encodeURIComponent(path)}`;
+    const compressedImageUrl = `https://kevinveragit.github.io/Maclellan-Frontend/compressed-images/${encodeURIComponent(path)}`;
     return compressedImageUrl;
 }
 
