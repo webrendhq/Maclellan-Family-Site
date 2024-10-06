@@ -60,6 +60,10 @@ jobs:
                 --header "Dropbox-API-Arg: {\"path\": \"$path\"}" \
                 -o "downloaded_images/$filename"
             done
+      
+      # Debug Step: Check if images were downloaded
+      - name: List downloaded images
+        run: ls -l downloaded_images
 
       # Step 6: Compress images using ImageMagick
       - name: Compress images
@@ -73,11 +77,15 @@ jobs:
             fi
           done
 
+      # Debug Step: Check if images were compressed
+      - name: List compressed images
+        run: ls -l compressed_images
+
       # Step 7: Commit and push compressed images
       - name: Commit and push compressed images
         run: |
           git config --local user.email "github-actions@github.com"
           git config --local user.name "GitHub Actions"
           git add compressed_images/
-          git commit -m "Add compressed images"
+          git commit -m "Add compressed images" || echo "No changes to commit"
           git push origin main
