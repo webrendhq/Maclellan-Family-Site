@@ -41,25 +41,29 @@ jobs:
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      # Step 5: Download images from Dropbox using curl
+      # Step 5: Download images from Dropbox using curl and debug response
       - name: Download images from Dropbox
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
           mkdir -p downloaded_images
-          curl -X POST https://api.dropboxapi.com/2/files/list_folder \
+          echo "Listing files from Dropbox..."
+          response=$(curl -X POST https://api.dropboxapi.com/2/files/list_folder \
             --header "Authorization: Bearer $ACCESS_TOKEN" \
             --header "Content-Type: application/json" \
-            --data "{\"path\": \"\", \"recursive\": true}" \
-            | jq '.entries[] | select(.\".tag\" == "file") | .path_lower' \
-            | while read -r path; do
+            --data "{\"path\": \"\", \"recursive\": true}")
+          echo "Dropbox response: $response"  # Debug response from Dropbox
+          
+          echo "$response" | jq '.entries[] | select(.\".tag\" == "file") | .path_lower' \
+          | while read -r path; do
               path=${path//\"/}  # Remove double quotes
               filename=$(basename "$path")
+              echo "Downloading file $filename from Dropbox..."
               curl -X POST https://content.dropboxapi.com/2/files/download \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
                 --header "Dropbox-API-Arg: {\"path\": \"$path\"}" \
                 -o "downloaded_images/$filename"
-            done
+          done
       
       # Debug Step: Check if images were downloaded
       - name: List downloaded images
@@ -71,6 +75,7 @@ jobs:
           mkdir -p compressed_images
           for img in downloaded_images/*; do
             if file "$img" | grep -qE 'image|bitmap'; then
+              echo "Compressing $img..."
               mogrify -path compressed_images -resize 50% "$img" || echo "Error processing $img, skipping..."
             else
               echo "Skipping non-image file $img"
@@ -91,4 +96,3 @@ jobs:
           git add compressed_images/
           git commit -m "Add compressed images" || echo "No changes to commit"
           git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
- 
