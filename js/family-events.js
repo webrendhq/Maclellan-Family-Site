@@ -9,7 +9,7 @@ onAuthStateChanged(auth, (user) => {
         window.location.href = '/sign-in.html';
     }
 });
-
+ 
 // Function to get URL parameters
 function getUrlParameter(name) {
     name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
