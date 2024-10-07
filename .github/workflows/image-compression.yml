@@ -73,7 +73,7 @@ jobs:
               temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
               if [ "$temp_link" != "null" ]; then
-                filename=$(basename "$path")
+                filename=$(basename "$path" | tr ' ' '_')  # Replace spaces with underscores
                 echo "Downloading $filename from $temp_link"
                 curl -L "$temp_link" -o "downloaded_images/$filename"
 
@@ -128,7 +128,7 @@ jobs:
               temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
               if [ "$temp_link" != "null" ]; then
-                filename=$(basename "$path" .mp4).jpg  # Create a jpg thumbnail filename based on video name
+                filename=$(basename "$path" .mp4 | tr ' ' '_').jpg  # Replace spaces with underscores and create jpg thumbnail
                 echo "Generating thumbnail for $path..."
 
                 # Use ffmpeg to extract the thumbnail from the temporary video link
