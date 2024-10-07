@@ -20,10 +20,16 @@ function getUrlParameter(name) {
 
 const year = getUrlParameter('year');
 
+// Function to sanitize file names: replace spaces with underscores and convert to lowercase
+function sanitizeFileName(fileName) {
+    return fileName.replace(/\s+/g, '_').toLowerCase();
+}
+
 // Function to construct the relative URL for the compressed image
 async function getCompressedImageUrl(path) {
+    const sanitizedPath = sanitizeFileName(path);  // Sanitize the path to replace spaces with underscores and lowercase
     // Use a relative path to access the images from the compressed-images folder
-    const compressedImageUrl = `../compressed-images/${encodeURIComponent(path)}`;
+    const compressedImageUrl = `../compressed-images/${encodeURIComponent(sanitizedPath)}`;
     return compressedImageUrl;
 }
 
