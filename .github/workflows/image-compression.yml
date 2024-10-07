@@ -65,16 +65,6 @@ jobs:
           # Process each image one by one
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
-              filename=$(basename "$path")
-              sanitized_filename="${filename// /_}"
-              compressed_image="compressed_images/$sanitized_filename"
-
-              # Skip if the compressed image already exists
-              if [ -f "$compressed_image" ]; then
-                echo "Compressed image already exists for $sanitized_filename, skipping..."
-                continue
-              fi
-
               echo "Generating temporary link for $path..."
               temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
@@ -83,29 +73,30 @@ jobs:
               temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
               if [ "$temp_link" != "null" ]; then
+                filename=$(basename "$path" | tr ' ' '_')
                 echo "Downloading $filename from $temp_link"
-                curl -L "$temp_link" -o "downloaded_images/$sanitized_filename"
+                curl -L "$temp_link" -o "downloaded_images/$filename"
 
                 # Compress the image
-                echo "Compressing $sanitized_filename..."
+                echo "Compressing $filename..."
                 mkdir -p compressed_images
-                mogrify -path compressed_images -resize 50% "downloaded_images/$sanitized_filename" || echo "Error compressing $sanitized_filename"
+                mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
 
                 # Commit and push the compressed image
                 git config --global user.email "github-actions[bot]@users.noreply.github.com"
                 git config --global user.name "github-actions[bot]"
-                git add compressed_images/$sanitized_filename || echo "No matching files"
-                git commit -m "Add compressed image: $sanitized_filename" || echo "No changes to commit"
+                git add compressed_images/$filename || echo "No matching files"
+                git commit -m "Add compressed image: $filename" || echo "No changes to commit"
                 git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
 
                 # Remove the original downloaded image to save space
-                rm "downloaded_images/$sanitized_filename"
+                rm "downloaded_images/$filename"
               else
                 echo "Failed to get temporary link for $path"
               fi
           done
 
-      # Step 6: Search for and process video thumbnails incrementally (skipping already processed thumbnails)
+      # Step 6: Search for and process video thumbnails incrementally (saved to compressed_video_thumbnails)
       - name: Search and process video thumbnails incrementally
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
@@ -129,48 +120,42 @@ jobs:
           # Process each video one by one to extract thumbnails
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
-              filename=$(basename "$path" .mp4)  # Remove the .mp4 extension
-              sanitized_filename="${filename// /_}.jpg"  # Create a sanitized jpg thumbnail filename
-              compressed_thumbnail="compressed_video_thumbnails/$sanitized_filename"
+              echo "Generating thumbnail for $path..."
+              filename=$(basename "$path" | tr ' ' '_')
+              thumb_path="compressed_video_thumbnails/${filename%.*}.jpg"
 
-              # Skip if the compressed thumbnail already exists
-              if [ -f "$compressed_thumbnail" ]; then
-                echo "Compressed thumbnail already exists for $sanitized_filename, skipping..."
+              # Check if the thumbnail already exists
+              if [ -f "$thumb_path" ]; then
+                echo "Skipping thumbnail $thumb_path (already exists)"
                 continue
               fi
 
-              echo "Generating temporary link for $path..."
-              temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
+              # Use Dropbox API to get the thumbnail without downloading the video
+              temp_thumb_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_thumbnail_v2 \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
                 --header "Content-Type: application/json" \
-                --data "{\"path\": \"$path\"}")
-              temp_link=$(echo "$temp_link_response" | jq -r '.link')
+                --data "{\"resource\": {\"path\": \"$path\"}, \"size\": \"w640h480\"}")
 
-              # Remove any query parameters from the link
-              temp_link_cleaned=$(echo "$temp_link" | cut -d'?' -f1)
-
-              if [ "$temp_link_cleaned" != "null" ]; then
-                echo "Generating thumbnail for $path..."
-
-                # Use ffmpeg to extract the thumbnail from the cleaned video link
-                ffmpeg -i "$temp_link_cleaned" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$sanitized_filename"
+              if [ "$temp_thumb_response" != "null" ]; then
+                echo "Saving thumbnail for $filename..."
+                echo "$temp_thumb_response" > "downloaded_video_thumbnails/$thumb_path"
 
                 # Compress the thumbnail
-                echo "Compressing thumbnail $sanitized_filename..."
+                echo "Compressing thumbnail $thumb_path..."
                 mkdir -p compressed_video_thumbnails
-                mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$sanitized_filename" || echo "Error compressing $sanitized_filename"
+                mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$thumb_path" || echo "Error compressing thumbnail $thumb_path"
 
                 # Commit and push the compressed thumbnail
                 git config --global user.email "github-actions[bot]@users.noreply.github.com"
                 git config --global user.name "github-actions[bot]"
-                git add compressed_video_thumbnails/$sanitized_filename || echo "No matching files"
-                git commit -m "Add compressed video thumbnail: $sanitized_filename" || echo "No changes to commit"
+                git add compressed_video_thumbnails/$thumb_path || echo "No matching files"
+                git commit -m "Add compressed video thumbnail: $thumb_path" || echo "No changes to commit"
                 git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
 
                 # Remove the original downloaded thumbnail to save space
-                rm "downloaded_video_thumbnails/$sanitized_filename"
+                rm "downloaded_video_thumbnails/$thumb_path"
               else
-                echo "Failed to get temporary link for $path"
+                echo "Failed to get thumbnail for $path"
               fi
           done
 
