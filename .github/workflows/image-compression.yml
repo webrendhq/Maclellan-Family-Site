@@ -46,6 +46,9 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
+          set -e
+          set -x
+
           mkdir -p downloaded_images
           echo "Searching for all image files in Dropbox..."
 
@@ -62,9 +65,21 @@ jobs:
               }
             }')
 
+          if [ -z "$response" ] || ! echo "$response" | jq . >/dev/null 2>&1; then
+            echo "Error: Empty or invalid JSON response from Dropbox API"
+            exit 1
+          fi
+
+          echo "API Response:"
+          echo "$response"
+
           # Process each image one by one
-          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
+          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower // empty' \
           | while read -r path; do
+              if [ -z "$path" ]; then
+                echo "Skipping empty path"
+                continue
+              fi
               filename=$(basename "$path")
               filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
               
@@ -74,9 +89,13 @@ jobs:
                   --header "Authorization: Bearer $ACCESS_TOKEN" \
                   --header "Content-Type: application/json" \
                   --data "{\"path\": \"$path\"}")
-                temp_link=$(echo "$temp_link_response" | jq -r '.link')
+                
+                echo "Temporary link response:"
+                echo "$temp_link_response"
+                
+                temp_link=$(echo "$temp_link_response" | jq -r '.link // empty')
 
-                if [ "$temp_link" != "null" ]; then
+                if [ -n "$temp_link" ]; then
                   echo "Downloading $filename from $temp_link"
                   curl -L "$temp_link" -o "downloaded_images/$filename"
 
@@ -107,6 +126,9 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
+          set -e
+          set -x
+
           mkdir -p downloaded_video_thumbnails compressed_video_thumbnails
           echo "Searching for all video files in Dropbox..."
 
@@ -123,9 +145,21 @@ jobs:
               }
             }')
 
+          if [ -z "$response" ] || ! echo "$response" | jq . >/dev/null 2>&1; then
+            echo "Error: Empty or invalid JSON response from Dropbox API"
+            exit 1
+          fi
+
+          echo "API Response:"
+          echo "$response"
+
           # Process each video one by one to extract thumbnails
-          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
+          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower // empty' \
           | while read -r path; do
+              if [ -z "$path" ]; then
+                echo "Skipping empty path"
+                continue
+              fi
               filename=$(basename "$path" .mp4).jpg  # Use the video name without mp4 extension for the thumbnail
               filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
 
@@ -135,11 +169,16 @@ jobs:
                   --header "Authorization: Bearer $ACCESS_TOKEN" \
                   --header "Content-Type: application/json" \
                   --data "{\"path\": \"$path\"}")
-                temp_link=$(echo "$temp_link_response" | jq -r '.link')
-
-                temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)  # Clean the URL fragment
                 
-                if [ "$temp_link_cleaned" != "null" ]; then
+                echo "Temporary link response:"
+                echo "$temp_link_response"
+                
+                temp_link=$(echo "$temp_link_response" | jq -r '.link // empty')
+
+                if [ -n "$temp_link" ]; then
+                  temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)  # Clean the URL fragment
+                  echo "Cleaned temporary link: $temp_link_cleaned"
+                  
                   # Use ffmpeg to extract the thumbnail from the cleaned temporary video link
                   ffmpeg -y -i "$temp_link_cleaned" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$filename" || echo "Failed to generate thumbnail for $filename"
 
