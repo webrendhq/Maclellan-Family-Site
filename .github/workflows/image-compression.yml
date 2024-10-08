@@ -80,8 +80,7 @@ jobs:
                 echo "Skipping empty path"
                 continue
               fi
-              filename=$(basename "$path" | sed 's/#/\\#/g')
-              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
+              filename=$(basename "$path" | sed 's/[^a-zA-Z0-9._-]/_/g')
               
               if [ ! -f "compressed_images/$filename" ]; then
                 echo "Generating temporary link for $path..."
@@ -96,26 +95,29 @@ jobs:
                 temp_link=$(echo "$temp_link_response" | jq -r '.link // empty')
 
                 if [ -n "$temp_link" ]; then
-                  temp_link_encoded=$(printf '%s' "$temp_link" | jq -sRr @uri)
+                  temp_link_encoded=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$temp_link', safe=':/?='))")
                   echo "Encoded temporary link: $temp_link_encoded"
                   
-                  echo "Downloading $filename from $temp_link_encoded"
-                  curl -L "$temp_link_encoded" -o "downloaded_images/$filename"
+                  echo "Attempting to download: $temp_link_encoded"
+                  curl -v -L "$temp_link_encoded" -o "downloaded_images/$filename"
 
-                  # Compress the image
-                  echo "Compressing $filename..."
-                  mkdir -p compressed_images
-                  mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
+                  if [ $? -eq 0 ]; then
+                    echo "Compressing $filename..."
+                    mkdir -p compressed_images
+                    mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
 
-                  # Commit and push the compressed image
-                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
-                  git config --global user.name "github-actions[bot]"
-                  git add compressed_images/$filename || echo "No matching files"
-                  git commit -m "Add compressed image: $filename" || echo "No changes to commit"
-                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+                    # Commit and push the compressed image
+                    git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                    git config --global user.name "github-actions[bot]"
+                    git add compressed_images/$filename || echo "No matching files"
+                    git commit -m "Add compressed image: $filename" || echo "No changes to commit"
+                    git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
 
-                  # Remove the original downloaded image to save space
-                  rm "downloaded_images/$filename"
+                    # Remove the original downloaded image to save space
+                    rm "downloaded_images/$filename"
+                  else
+                    echo "Failed to download $filename"
+                  fi
                 else
                   echo "Failed to get temporary link for $path"
                 fi
@@ -163,9 +165,8 @@ jobs:
                 echo "Skipping empty path"
                 continue
               fi
-              filename=$(basename "$path" .mp4 | sed 's/#/\\#/g').jpg
-              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
-
+              filename=$(basename "$path" | sed 's/[^a-zA-Z0-9._-]/_/g').jpg
+              
               if [ ! -f "compressed_video_thumbnails/$filename" ]; then
                 echo "Generating thumbnail for $path..."
                 temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
@@ -179,18 +180,13 @@ jobs:
                 temp_link=$(echo "$temp_link_response" | jq -r '.link // empty')
 
                 if [ -n "$temp_link" ]; then
-                  temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)
-                  temp_link_encoded=$(printf '%s' "$temp_link_cleaned" | jq -sRr @uri)
+                  temp_link_encoded=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$temp_link', safe=':/?='))")
                   echo "Encoded temporary link: $temp_link_encoded"
                   
                   echo "Generating thumbnail for $filename..."
-                  ffmpeg -y -i "$temp_link_encoded" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/${filename}" || echo "Failed to generate thumbnail for $filename"
+                  ffmpeg -y -i "$temp_link_encoded" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/${filename}"
                   
-                  if [ $? -ne 0 ]; then
-                    echo "FFmpeg command failed for $filename"
-                    echo "FFmpeg version:"
-                    ffmpeg -version
-                  else
+                  if [ $? -eq 0 ]; then
                     echo "Compressing thumbnail $filename..."
                     mkdir -p compressed_video_thumbnails
                     mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/${filename}" || echo "Error compressing thumbnail $filename"
@@ -204,6 +200,10 @@ jobs:
 
                     # Remove the original downloaded thumbnail to save space
                     rm "downloaded_video_thumbnails/${filename}"
+                  else
+                    echo "Failed to generate thumbnail for $filename"
+                    echo "FFmpeg version:"
+                    ffmpeg -version
                   fi
                 else
                   echo "Failed to get temporary link for $path"
