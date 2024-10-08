@@ -46,7 +46,7 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          mkdir -p downloaded_images
+          mkdir -p downloaded_images compressed_images
           echo "Searching for all image files in Dropbox..."
 
           # Search for files with image extensions recursively
@@ -65,35 +65,40 @@ jobs:
           # Process each image one by one
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
-              echo "Generating temporary link for $path..."
-              temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
-                --header "Authorization: Bearer $ACCESS_TOKEN" \
-                --header "Content-Type: application/json" \
-                --data "{\"path\": \"$path\"}")
-              temp_link=$(echo "$temp_link_response" | jq -r '.link')
+              filename=$(basename "$path")
+              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
 
-              if [ "$temp_link" != "null" ]; then
-                filename=$(basename "$path" | tr ' ' '_')  # Replace spaces with underscores
-                echo "Downloading $filename from $temp_link"
-                curl -L "$temp_link" -o "downloaded_images/$filename"
+              if [ ! -f "compressed_images/$filename" ]; then
+                echo "Generating temporary link for $path..."
+                temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
+                  --header "Authorization: Bearer $ACCESS_TOKEN" \
+                  --header "Content-Type: application/json" \
+                  --data "{\"path\": \"$path\"}")
+                temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
-                # Compress the image
-                echo "Compressing $filename..."
-                mkdir -p compressed_images
-                mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
+                if [ "$temp_link" != "null" ]; then
+                  echo "Downloading $filename from $temp_link"
+                  curl -L "$temp_link" -o "downloaded_images/$filename"
 
-                # Ensure the file is tracked, added, and committed properly
-                git config --global user.email "github-actions[bot]@users.noreply.github.com"
-                git config --global user.name "github-actions[bot]"
-                git add compressed_images/$filename || echo "No matching files"
-                git status  # Check the status to see untracked files
-                git commit -m "Add compressed image: $filename" || echo "No changes to commit"
-                git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+                  # Compress the image
+                  echo "Compressing $filename..."
+                  mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
 
-                # Remove the original downloaded image to save space
-                rm "downloaded_images/$filename"
+                  # Commit and push the compressed image
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --global user.name "github-actions[bot]"
+                  git add compressed_images/$filename || echo "No matching files"
+                  git status  # Check the status to see untracked files
+                  git commit -m "Add compressed image: $filename" || echo "No changes to commit"
+                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+
+                  # Remove the original downloaded image to save space
+                  rm "downloaded_images/$filename"
+                else
+                  echo "Failed to get temporary link for $path"
+                fi
               else
-                echo "Failed to get temporary link for $path"
+                echo "$filename is already compressed, skipping."
               fi
           done
 
@@ -102,7 +107,7 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          mkdir -p downloaded_video_thumbnails
+          mkdir -p downloaded_video_thumbnails compressed_video_thumbnails
           echo "Searching for all video files in Dropbox..."
 
           # Search for files with video extensions recursively
@@ -121,37 +126,40 @@ jobs:
           # Process each video one by one to extract thumbnails
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
-              echo "Generating thumbnail for $path..."
-              temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
-                --header "Authorization: Bearer $ACCESS_TOKEN" \
-                --header "Content-Type: application/json" \
-                --data "{\"path\": \"$path\"}")
-              temp_link=$(echo "$temp_link_response" | jq -r '.link')
+              filename=$(basename "$path" .mp4).jpg  # Use the video name without mp4 extension for the thumbnail
+              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
 
-              if [ "$temp_link" != "null" ]; then
-                filename=$(basename "$path" .mp4).jpg  # Use the video name without mp4 extension for the thumbnail
-                filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
+              if [ ! -f "compressed_video_thumbnails/$filename" ]; then
+                echo "Generating thumbnail for $path..."
+                temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_thumbnail_v2 \
+                  --header "Authorization: Bearer $ACCESS_TOKEN" \
+                  --header "Content-Type: application/json" \
+                  --data "{\"path\": \"$path\", \"format\": {\".tag\": \"jpeg\"}, \"size\": {\".tag\": \"w640h480\"}}")
+                temp_link=$(echo "$temp_link_response" | jq -r '.link')
 
-                # Use ffmpeg to extract the thumbnail from the temporary video link
-                ffmpeg -i "$temp_link" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$filename"
+                if [ "$temp_link" != "null" ]; then
+                  echo "Downloading thumbnail for $filename"
+                  curl -L "$temp_link" -o "downloaded_video_thumbnails/$filename"
 
-                # Compress the thumbnail
-                echo "Compressing thumbnail $filename..."
-                mkdir -p compressed_video_thumbnails
-                mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$filename" || echo "Error compressing thumbnail $filename"
+                  # Compress the thumbnail
+                  echo "Compressing thumbnail $filename..."
+                  mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$filename" || echo "Error compressing thumbnail $filename"
 
-                # Ensure the file is tracked, added, and committed properly
-                git config --global user.email "github-actions[bot]@users.noreply.github.com"
-                git config --global user.name "github-actions[bot]"
-                git add compressed_video_thumbnails/$filename || echo "No matching files"
-                git status  # Check the status to see untracked files
-                git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
-                git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+                  # Commit and push the compressed thumbnail
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --global user.name "github-actions[bot]"
+                  git add compressed_video_thumbnails/$filename || echo "No matching files"
+                  git status  # Check the status to see untracked files
+                  git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
+                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
 
-                # Remove the original downloaded thumbnail to save space
-                rm "downloaded_video_thumbnails/$filename"
+                  # Remove the original downloaded thumbnail to save space
+                  rm "downloaded_video_thumbnails/$filename"
+                else
+                  echo "Failed to get temporary link for $path"
+                fi
               else
-                echo "Failed to get temporary link for $path"
+                echo "$filename thumbnail is already compressed, skipping."
               fi
           done
 
