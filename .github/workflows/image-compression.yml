@@ -80,7 +80,7 @@ jobs:
                 echo "Skipping empty path"
                 continue
               fi
-              filename=$(basename "$path")
+              filename=$(basename "$path" | sed 's/#/\\#/g')
               filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
               
               if [ ! -f "compressed_images/$filename" ]; then
@@ -96,8 +96,11 @@ jobs:
                 temp_link=$(echo "$temp_link_response" | jq -r '.link // empty')
 
                 if [ -n "$temp_link" ]; then
-                  echo "Downloading $filename from $temp_link"
-                  curl -L "$temp_link" -o "downloaded_images/$filename"
+                  temp_link_encoded=$(printf '%s' "$temp_link" | jq -sRr @uri)
+                  echo "Encoded temporary link: $temp_link_encoded"
+                  
+                  echo "Downloading $filename from $temp_link_encoded"
+                  curl -L "$temp_link_encoded" -o "downloaded_images/$filename"
 
                   # Compress the image
                   echo "Compressing $filename..."
@@ -160,7 +163,7 @@ jobs:
                 echo "Skipping empty path"
                 continue
               fi
-              filename=$(basename "$path" .mp4).jpg  # Use the video name without mp4 extension for the thumbnail
+              filename=$(basename "$path" .mp4 | sed 's/#/\\#/g').jpg
               filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
 
               if [ ! -f "compressed_video_thumbnails/$filename" ]; then
@@ -176,26 +179,32 @@ jobs:
                 temp_link=$(echo "$temp_link_response" | jq -r '.link // empty')
 
                 if [ -n "$temp_link" ]; then
-                  temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)  # Clean the URL fragment
-                  echo "Cleaned temporary link: $temp_link_cleaned"
+                  temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)
+                  temp_link_encoded=$(printf '%s' "$temp_link_cleaned" | jq -sRr @uri)
+                  echo "Encoded temporary link: $temp_link_encoded"
                   
-                  # Use ffmpeg to extract the thumbnail from the cleaned temporary video link
-                  ffmpeg -y -i "$temp_link_cleaned" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$filename" || echo "Failed to generate thumbnail for $filename"
+                  echo "Generating thumbnail for $filename..."
+                  ffmpeg -y -i "$temp_link_encoded" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/${filename}" || echo "Failed to generate thumbnail for $filename"
+                  
+                  if [ $? -ne 0 ]; then
+                    echo "FFmpeg command failed for $filename"
+                    echo "FFmpeg version:"
+                    ffmpeg -version
+                  else
+                    echo "Compressing thumbnail $filename..."
+                    mkdir -p compressed_video_thumbnails
+                    mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/${filename}" || echo "Error compressing thumbnail $filename"
 
-                  # Compress the thumbnail
-                  echo "Compressing thumbnail $filename..."
-                  mkdir -p compressed_video_thumbnails
-                  mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$filename" || echo "Error compressing thumbnail $filename"
+                    # Commit and push the compressed thumbnail
+                    git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                    git config --global user.name "github-actions[bot]"
+                    git add compressed_video_thumbnails/$filename || echo "No matching files"
+                    git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
+                    git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
 
-                  # Commit and push the compressed thumbnail
-                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
-                  git config --global user.name "github-actions[bot]"
-                  git add compressed_video_thumbnails/$filename || echo "No matching files"
-                  git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
-                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-
-                  # Remove the original downloaded thumbnail to save space
-                  rm "downloaded_video_thumbnails/$filename"
+                    # Remove the original downloaded thumbnail to save space
+                    rm "downloaded_video_thumbnails/${filename}"
+                  fi
                 else
                   echo "Failed to get temporary link for $path"
                 fi
