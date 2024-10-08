@@ -126,16 +126,31 @@ jobs:
           # Process each video one by one to extract thumbnails
           echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
           | while read -r path; do
+              ext="${path##*.}"
+              if [[ "$ext" != "mp4" && "$ext" != "avi" && "$ext" != "mkv" && "$ext" != "mov" ]]; then
+                echo "Skipping file with unsupported extension: $path"
+                continue
+              fi
+              
               filename=$(basename "$path" .mp4).jpg  # Use the video name without mp4 extension for the thumbnail
               filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
 
               if [ ! -f "video_compressed_images/$filename" ]; then
                 echo "Generating thumbnail for $path..."
+                path=$(printf '%s' "$path" | jq -sRr @uri)
                 temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                   --header "Authorization: Bearer $ACCESS_TOKEN" \
                   --header "Content-Type: application/json" \
                   --data "{\"path\": \"$path\"}")
-                temp_link=$(echo "$temp_link_response" | jq -r '.link')
+                echo "Debug: Temporary link response: $temp_link_response"
+                
+                if jq -e . >/dev/null 2>&1 <<< "$temp_link_response"; then
+                  temp_link=$(echo "$temp_link_response" | jq -r '.link')
+                else
+                  echo "Error: Invalid JSON response from Dropbox API"
+                  echo "Response: $temp_link_response"
+                  continue
+                fi
 
                 temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)  # Clean the URL fragment
                 
@@ -163,8 +178,9 @@ jobs:
               else
                 echo "$filename is already compressed, skipping."
               fi
+              
+              sleep 1  # Add a 1-second delay between API calls
           done
-
 
       # Debug Step: Check if images and thumbnails were downloaded and compressed
       - name: List downloaded and compressed media
