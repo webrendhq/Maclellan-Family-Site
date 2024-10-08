@@ -63,6 +63,7 @@ jobs:
                 git commit -m "Add compressed image: $filename" || echo "No changes to commit for $filename"
               else
                 echo "Failed to get temporary link for $path"
+                echo "Response: $temp_link_response"
               fi
             else
               echo "$filename is already compressed, skipping."
@@ -88,6 +89,7 @@ jobs:
                 git commit -m "Add compressed video thumbnail: ${filename_without_ext}.jpg" || echo "No changes to commit for ${filename_without_ext}.jpg"
               else
                 echo "Failed to download thumbnail for $path"
+                echo "Response: $thumbnail_response"
               fi
             else
               echo "${filename_without_ext}.jpg thumbnail already exists, skipping."
@@ -110,8 +112,29 @@ jobs:
               }
             }')
 
+          echo "Debug: Search API Response"
+          echo "$search_response" | jq '.'
+
+          if ! echo "$search_response" | jq -e '.' >/dev/null 2>&1; then
+            echo "Error: Invalid JSON response from Dropbox search API"
+            echo "Raw response:"
+            echo "$search_response"
+            exit 1
+          fi
+
           echo "$search_response" | jq -c '.matches[]' | while read -r match; do
+            if [ -z "$match" ]; then
+              echo "Warning: Empty match, skipping"
+              continue
+            fi
+            
             path=$(echo "$match" | jq -r '.metadata.metadata.path_display')
+            if [ -z "$path" ] || [ "$path" = "null" ]; then
+              echo "Warning: Invalid path for match, skipping"
+              echo "Match data: $match"
+              continue
+            fi
+            
             filename=$(basename "$path")
             extension="${filename##*.}"
             filename_without_ext="${filename%.*}"
