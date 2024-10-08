@@ -1,4 +1,4 @@
-name: Recursive Dropbox Media Processing
+name: Process All Dropbox Media
 
 on:
   push:
@@ -36,48 +36,11 @@ jobs:
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      - name: Process Dropbox folders recursively
+      - name: Process all Dropbox media
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          process_folder() {
-            local folder_path="$1"
-            echo "Processing folder: $folder_path"
-            
-            # List folder contents
-            response=$(curl -X POST https://api.dropboxapi.com/2/files/list_folder \
-              --header "Authorization: Bearer $ACCESS_TOKEN" \
-              --header "Content-Type: application/json" \
-              --data "{\"path\": \"$folder_path\", \"recursive\": false}")
-            
-            # Process each entry in the folder
-            echo "$response" | jq -c '.entries[]' | while read -r entry; do
-              path=$(echo "$entry" | jq -r '.path_display')
-              tag=$(echo "$entry" | jq -r '.".tag"')
-              
-              if [ "$tag" = "folder" ]; then
-                # Recursively process subfolders
-                process_folder "$path"
-              elif [ "$tag" = "file" ]; then
-                # Process file based on its extension
-                extension="${path##*.}"
-                filename=$(basename "$path")
-                filename_without_ext="${filename%.*}"
-                
-                case "$extension" in
-                  jpg|jpeg|png|gif|heic)
-                    process_image "$path" "$filename"
-                    ;;
-                  mp4|avi|mkv|mov)
-                    process_video_thumbnail "$path" "$filename_without_ext"
-                    ;;
-                  *)
-                    echo "Skipping unsupported file: $path"
-                    ;;
-                esac
-              fi
-            done
-          }
+          mkdir -p compressed_images compressed_video_thumbnails
 
           process_image() {
             local path="$1"
@@ -131,11 +94,40 @@ jobs:
             fi
           }
 
-          # Ensure directories exist
-          mkdir -p compressed_images compressed_video_thumbnails
+          # Search for all images and videos
+          search_response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
+            --header "Authorization: Bearer $ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{
+              "query": ".jpg OR .jpeg OR .png OR .gif OR .heic OR .mp4 OR .avi OR .mkv OR .mov",
+              "options": {
+                "file_status": "active",
+                "filename_only": false,
+                "max_results": 5000
+              },
+              "match_field_options": {
+                "include_highlights": false
+              }
+            }')
 
-          # Start processing from the root folder
-          process_folder ""
+          echo "$search_response" | jq -c '.matches[]' | while read -r match; do
+            path=$(echo "$match" | jq -r '.metadata.metadata.path_display')
+            filename=$(basename "$path")
+            extension="${filename##*.}"
+            filename_without_ext="${filename%.*}"
+
+            case "$extension" in
+              jpg|jpeg|png|gif|heic)
+                process_image "$path" "$filename"
+                ;;
+              mp4|avi|mkv|mov)
+                process_video_thumbnail "$path" "$filename_without_ext"
+                ;;
+              *)
+                echo "Skipping unsupported file: $path"
+                ;;
+            esac
+          done
 
           # Push all changes
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
