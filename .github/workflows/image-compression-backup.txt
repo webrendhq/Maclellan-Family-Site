@@ -1,0 +1,178 @@
+name: Refresh Token, Compress, and Upload Images & Video Thumbnails Incrementally
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  compress-media:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Step 3: Install Python, ImageMagick, ffmpeg, and jq
+      - name: Install Python, ImageMagick, ffmpeg, and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip imagemagick jq ffmpeg
+
+      # Step 4: Refresh Dropbox Access Token
+      - name: Refresh Dropbox Access Token
+        id: refresh_token
+        env:
+          CLIENT_ID: ${{ secrets.DROPBOX_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.DROPBOX_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+        run: |
+          response=$(curl -X POST https://api.dropboxapi.com/oauth2/token \
+            --data "grant_type=refresh_token&refresh_token=$REFRESH_TOKEN&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET" \
+            -H "Content-Type: application/x-www-form-urlencoded")
+          
+          ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
+          echo "::set-output name=access_token::$ACCESS_TOKEN"
+
+      # Step 5: Search and process images incrementally
+      - name: Search and process images incrementally
+        env:
+          ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
+        run: |
+          mkdir -p downloaded_images
+          echo "Searching for all image files in Dropbox..."
+
+          # Search for files with image extensions recursively
+          response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
+            --header "Authorization: Bearer $ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{
+              "query": ".jpg OR .jpeg OR .png OR .gif OR .heic",
+              "options": {
+                "filename_only": true,
+                "file_status": "active",
+                "max_results": 1000
+              }
+            }')
+
+          # Process each image one by one
+          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
+          | while read -r path; do
+              filename=$(basename "$path")
+              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
+              
+              if [ ! -f "compressed_images/$filename" ]; then
+                echo "Generating temporary link for $path..."
+                temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
+                  --header "Authorization: Bearer $ACCESS_TOKEN" \
+                  --header "Content-Type: application/json" \
+                  --data "{\"path\": \"$path\"}")
+                temp_link=$(echo "$temp_link_response" | jq -r '.link')
+
+                if [ "$temp_link" != "null" ]; then
+                  echo "Downloading $filename from $temp_link"
+                  curl -L "$temp_link" -o "downloaded_images/$filename"
+
+                  # Compress the image
+                  echo "Compressing $filename..."
+                  mkdir -p compressed_images
+                  mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
+
+                  # Commit and push the compressed image
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --global user.name "github-actions[bot]"
+                  git add compressed_images/$filename || echo "No matching files"
+                  git commit -m "Add compressed image: $filename" || echo "No changes to commit"
+                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+
+                  # Remove the original downloaded image to save space
+                  rm "downloaded_images/$filename"
+                else
+                  echo "Failed to get temporary link for $path"
+                fi
+              else
+                echo "$filename is already compressed, skipping."
+              fi
+          done
+
+      # Step 6: Search and process video thumbnails incrementally (saved to compressed_video_thumbnails)
+      - name: Search and process video thumbnails incrementally
+        env:
+          ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
+        run: |
+          mkdir -p downloaded_video_thumbnails compressed_video_thumbnails
+          echo "Searching for all video files in Dropbox..."
+
+          # Search for files with video extensions recursively
+          response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
+            --header "Authorization: Bearer $ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data '{
+              "query": ".mp4 OR .avi OR .mkv OR .mov",
+              "options": {
+                "filename_only": true,
+                "file_status": "active",
+                "max_results": 1000
+              }
+            }')
+
+          # Process each video one by one to extract thumbnails
+          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
+          | while read -r path; do
+              filename=$(basename "$path" .mp4).jpg  # Use the video name without mp4 extension for the thumbnail
+              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
+
+              if [ ! -f "compressed_video_thumbnails/$filename" ]; then
+                echo "Generating thumbnail for $path..."
+                temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
+                  --header "Authorization: Bearer $ACCESS_TOKEN" \
+                  --header "Content-Type: application/json" \
+                  --data "{\"path\": \"$path\"}")
+                temp_link=$(echo "$temp_link_response" | jq -r '.link')
+
+                temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)  # Clean the URL fragment
+                
+                if [ "$temp_link_cleaned" != "null" ]; then
+                  # Use ffmpeg to extract the thumbnail from the cleaned temporary video link
+                  ffmpeg -y -i "$temp_link_cleaned" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$filename" || echo "Failed to generate thumbnail for $filename"
+
+                  # Compress the thumbnail
+                  echo "Compressing thumbnail $filename..."
+                  mkdir -p compressed_video_thumbnails
+                  mogrify -path compressed_video_thumbnails -resize 50% "downloaded_video_thumbnails/$filename" || echo "Error compressing thumbnail $filename"
+
+                  # Commit and push the compressed thumbnail
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --global user.name "github-actions[bot]"
+                  git add compressed_video_thumbnails/$filename || echo "No matching files"
+                  git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
+                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+
+                  # Remove the original downloaded thumbnail to save space
+                  rm "downloaded_video_thumbnails/$filename"
+                else
+                  echo "Failed to get temporary link for $path"
+                fi
+              else
+                echo "$filename is already compressed, skipping."
+              fi
+          done
+
+      # Debug Step: Check if images and thumbnails were downloaded and compressed
+      - name: List downloaded and compressed media
+        run: |
+          echo "Downloaded Images:"
+          ls -l downloaded_images
+          echo "Compressed Images:"
+          ls -l compressed_images
+          echo "Downloaded Video Thumbnails:"
+          ls -l downloaded_video_thumbnails
+          echo "Compressed Video Thumbnails:"
+          ls -l compressed_video_thumbnails
