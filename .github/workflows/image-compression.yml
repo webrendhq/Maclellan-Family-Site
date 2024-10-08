@@ -140,8 +140,8 @@ jobs:
                 temp_link_cleaned=$(echo "$temp_link" | cut -d'#' -f1)  # Clean the URL fragment
                 
                 if [ "$temp_link_cleaned" != "null" ]; then
-                  # Use ffmpeg to extract the thumbnail from the cleaned temporary video link
-                  ffmpeg -y -i "$temp_link_cleaned" -ss 00:00:02 -vframes 1 -q:v 2 "downloaded_video_thumbnails/$filename" || echo "Failed to generate thumbnail for $filename"
+                  # Use ffmpeg to extract the thumbnail and specify pixel format
+                  ffmpeg -y -i "$temp_link_cleaned" -ss 00:00:02 -vframes 1 -q:v 2 -pix_fmt yuv420p "downloaded_video_thumbnails/$filename" || echo "Failed to generate thumbnail for $filename"
 
                   # Compress the thumbnail
                   echo "Compressing thumbnail $filename..."
@@ -164,6 +164,7 @@ jobs:
                 echo "$filename is already compressed, skipping."
               fi
           done
+
 
       # Debug Step: Check if images and thumbnails were downloaded and compressed
       - name: List downloaded and compressed media
