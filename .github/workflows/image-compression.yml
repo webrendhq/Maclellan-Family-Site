@@ -1,4 +1,4 @@
-name: Refresh Token, Compress, and Upload Images & Video Thumbnails Incrementally
+name: Recursive Dropbox Media Processing
 
 on:
   push:
@@ -6,27 +6,23 @@ on:
       - main
 
 jobs:
-  compress-media:
+  process-media:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      # Step 3: Install Python, ImageMagick, ffmpeg, and jq
-      - name: Install Python, ImageMagick, ffmpeg, and jq
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip imagemagick jq ffmpeg
 
-      # Step 4: Refresh Dropbox Access Token
       - name: Refresh Dropbox Access Token
         id: refresh_token
         env:
@@ -37,167 +33,118 @@ jobs:
           response=$(curl -X POST https://api.dropboxapi.com/oauth2/token \
             --data "grant_type=refresh_token&refresh_token=$REFRESH_TOKEN&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET" \
             -H "Content-Type: application/x-www-form-urlencoded")
-          
           ACCESS_TOKEN=$(echo $response | jq -r '.access_token')
           echo "::set-output name=access_token::$ACCESS_TOKEN"
 
-      # Step 5: Search and process images incrementally
-      - name: Search and process images incrementally
+      - name: Process Dropbox folders recursively
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          mkdir -p downloaded_images compressed_images
-          echo "Searching for all image files in Dropbox..."
-
-          # Search for files with image extensions recursively
-          response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
-            --header "Authorization: Bearer $ACCESS_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data '{
-              "query": ".jpg OR .jpeg OR .png OR .gif OR .heic",
-              "options": {
-                "filename_only": true,
-                "file_status": "active",
-                "max_results": 1000
-              }
-            }')
-
-          # Process each image one by one
-          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
-          | while read -r path; do
-              filename=$(basename "$path")
-              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
+          process_folder() {
+            local folder_path="$1"
+            echo "Processing folder: $folder_path"
+            
+            # List folder contents
+            response=$(curl -X POST https://api.dropboxapi.com/2/files/list_folder \
+              --header "Authorization: Bearer $ACCESS_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data "{\"path\": \"$folder_path\", \"recursive\": false}")
+            
+            # Process each entry in the folder
+            echo "$response" | jq -c '.entries[]' | while read -r entry; do
+              path=$(echo "$entry" | jq -r '.path_display')
+              tag=$(echo "$entry" | jq -r '.".tag"')
               
-              if [ ! -f "compressed_images/$filename" ]; then
-                echo "Generating temporary link for $path..."
-                encoded_path=$(printf '%s' "$path" | jq -sRr @uri)
-                temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
-                  --header "Authorization: Bearer $ACCESS_TOKEN" \
-                  --header "Content-Type: application/json" \
-                  --data "{\"path\": \"$encoded_path\"}")
-                echo "Debug: Temporary link response for image: $temp_link_response"
+              if [ "$tag" = "folder" ]; then
+                # Recursively process subfolders
+                process_folder "$path"
+              elif [ "$tag" = "file" ]; then
+                # Process file based on its extension
+                extension="${path##*.}"
+                filename=$(basename "$path")
+                filename_without_ext="${filename%.*}"
                 
-                if jq -e . >/dev/null 2>&1 <<< "$temp_link_response"; then
-                  temp_link=$(echo "$temp_link_response" | jq -r '.link')
-                  if [ "$temp_link" != "null" ] && [ -n "$temp_link" ]; then
-                    echo "Downloading $filename from $temp_link"
-                    curl -L "$temp_link" -o "downloaded_images/$filename"
+                case "$extension" in
+                  jpg|jpeg|png|gif|heic)
+                    process_image "$path" "$filename"
+                    ;;
+                  mp4|avi|mkv|mov)
+                    process_video_thumbnail "$path" "$filename_without_ext"
+                    ;;
+                  *)
+                    echo "Skipping unsupported file: $path"
+                    ;;
+                esac
+              fi
+            done
+          }
 
-                    # Compress the image
-                    echo "Compressing $filename..."
-                    mogrify -path compressed_images -resize 50% "downloaded_images/$filename" || echo "Error compressing $filename"
-
-                    # Commit and push the compressed image
-                    git config --global user.email "github-actions[bot]@users.noreply.github.com"
-                    git config --global user.name "github-actions[bot]"
-                    git add compressed_images/$filename || echo "No matching files"
-                    git commit -m "Add compressed image: $filename" || echo "No changes to commit"
-                    git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-
-                    # Remove the original downloaded image to save space
-                    rm "downloaded_images/$filename"
-                  else
-                    echo "Failed to get valid temporary link for $path"
-                  fi
-                else
-                  echo "Error: Invalid JSON response from Dropbox API for image"
-                  echo "Response: $temp_link_response"
-                fi
+          process_image() {
+            local path="$1"
+            local filename="$2"
+            
+            if [ ! -f "compressed_images/$filename" ]; then
+              echo "Processing image: $path"
+              encoded_path=$(printf '%s' "$path" | jq -sRr @uri)
+              temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
+                --header "Authorization: Bearer $ACCESS_TOKEN" \
+                --header "Content-Type: application/json" \
+                --data "{\"path\": \"$encoded_path\"}")
+              
+              temp_link=$(echo "$temp_link_response" | jq -r '.link')
+              if [ "$temp_link" != "null" ] && [ -n "$temp_link" ]; then
+                curl -L "$temp_link" -o "temp_$filename"
+                mogrify -path compressed_images -resize 50% "temp_$filename"
+                rm "temp_$filename"
+                git add compressed_images/$filename
+                git commit -m "Add compressed image: $filename" || echo "No changes to commit for $filename"
               else
-                echo "$filename is already compressed, skipping."
+                echo "Failed to get temporary link for $path"
               fi
+            else
+              echo "$filename is already compressed, skipping."
+            fi
+          }
+
+          process_video_thumbnail() {
+            local path="$1"
+            local filename_without_ext="$2"
+            
+            if [ ! -f "compressed_video_thumbnails/${filename_without_ext}.jpg" ]; then
+              echo "Processing video thumbnail: $path"
+              encoded_path=$(printf '%s' "$path" | jq -sRr @uri)
+              thumbnail_response=$(curl -X POST https://content.dropboxapi.com/2/files/get_thumbnail_v2 \
+                --header "Authorization: Bearer $ACCESS_TOKEN" \
+                --header "Dropbox-API-Arg: {\"resource\": {\"path\": \"$encoded_path\"}, \"format\": \"jpeg\", \"size\": \"w1024h768\", \"mode\": \"bestfit\"}" \
+                --output "temp_${filename_without_ext}.jpg")
               
-              sleep 1  # Add a 1-second delay between API calls
-          done
-
-      # Step 6: Search and process video thumbnails incrementally (saved to video_compressed_images)
-      - name: Search and process video thumbnails incrementally
-        env:
-          ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
-        run: |
-          mkdir -p downloaded_video_thumbnails video_compressed_images
-          echo "Searching for all video files in Dropbox..."
-
-          # Search for files with video extensions recursively
-          response=$(curl -X POST https://api.dropboxapi.com/2/files/search_v2 \
-            --header "Authorization: Bearer $ACCESS_TOKEN" \
-            --header "Content-Type: application/json" \
-            --data '{
-              "query": ".mp4 OR .avi OR .mkv OR .mov",
-              "options": {
-                "filename_only": true,
-                "file_status": "active",
-                "max_results": 1000
-              }
-            }')
-
-          # Process each video one by one to extract thumbnails
-          echo "$response" | jq -r '.matches[] | select(.metadata.metadata[".tag"] == "file") | .metadata.metadata.path_lower' \
-          | while read -r path; do
-              ext="${path##*.}"
-              if [[ "$ext" != "mp4" && "$ext" != "avi" && "$ext" != "mkv" && "$ext" != "mov" ]]; then
-                echo "Skipping file with unsupported extension: $path"
-                continue
-              fi
-              
-              filename=$(basename "$path")
-              filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
-              filename_without_ext="${filename%.*}"
-
-              if [ ! -f "video_compressed_images/${filename_without_ext}.jpg" ]; then
-                echo "Generating thumbnail for $path..."
-                
-                # Properly encode the path for the API request
-                encoded_path=$(printf '%s' "$path" | jq -sRr @uri)
-                
-                temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
-                  --header "Authorization: Bearer $ACCESS_TOKEN" \
-                  --header "Content-Type: application/json" \
-                  --data "{\"path\": \"$encoded_path\"}")
-                echo "Debug: Temporary link response for video: $temp_link_response"
-                
-                if jq -e . >/dev/null 2>&1 <<< "$temp_link_response"; then
-                  temp_link=$(echo "$temp_link_response" | jq -r '.link')
-                  if [ "$temp_link" != "null" ] && [ -n "$temp_link" ]; then
-                    # Use ffmpeg to extract the thumbnail and specify pixel format
-                    ffmpeg -y -i "$temp_link" -ss 00:00:02 -vframes 1 -q:v 2 -pix_fmt yuv420p "downloaded_video_thumbnails/${filename_without_ext}.jpg" || echo "Failed to generate thumbnail for $filename"
-
-                    # Compress the thumbnail
-                    echo "Compressing thumbnail ${filename_without_ext}.jpg..."
-                    mkdir -p video_compressed_images
-                    mogrify -path video_compressed_images -resize 50% "downloaded_video_thumbnails/${filename_without_ext}.jpg" || echo "Error compressing thumbnail ${filename_without_ext}.jpg"
-
-                    # Commit and push the compressed thumbnail
-                    git config --global user.email "github-actions[bot]@users.noreply.github.com"
-                    git config --global user.name "github-actions[bot]"
-                    git add video_compressed_images/${filename_without_ext}.jpg || echo "No matching files"
-                    git commit -m "Add compressed video thumbnail: ${filename_without_ext}.jpg" || echo "No changes to commit"
-                    git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-
-                    # Remove the original downloaded thumbnail to save space
-                    rm "downloaded_video_thumbnails/${filename_without_ext}.jpg"
-                  else
-                    echo "Failed to get valid temporary link for $path"
-                  fi
-                else
-                  echo "Error: Invalid JSON response from Dropbox API for video"
-                  echo "Response: $temp_link_response"
-                fi
+              if [ -f "temp_${filename_without_ext}.jpg" ]; then
+                mogrify -path compressed_video_thumbnails -resize 50% "temp_${filename_without_ext}.jpg"
+                rm "temp_${filename_without_ext}.jpg"
+                git add compressed_video_thumbnails/${filename_without_ext}.jpg
+                git commit -m "Add compressed video thumbnail: ${filename_without_ext}.jpg" || echo "No changes to commit for ${filename_without_ext}.jpg"
               else
-                echo "${filename_without_ext}.jpg is already compressed, skipping."
+                echo "Failed to download thumbnail for $path"
               fi
-              
-              sleep 1  # Add a 1-second delay between API calls
-          done
+            else
+              echo "${filename_without_ext}.jpg thumbnail already exists, skipping."
+            fi
+          }
 
-      # Debug Step: Check if images and thumbnails were downloaded and compressed
-      - name: List downloaded and compressed media
+          # Ensure directories exist
+          mkdir -p compressed_images compressed_video_thumbnails
+
+          # Start processing from the root folder
+          process_folder ""
+
+          # Push all changes
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+
+      - name: List processed media
         run: |
-          echo "Downloaded Images:"
-          ls -l downloaded_images
           echo "Compressed Images:"
           ls -l compressed_images
-          echo "Downloaded Video Thumbnails:"
-          ls -l downloaded_video_thumbnails
           echo "Compressed Video Thumbnails:"
-          ls -l video_compressed_images
+          ls -l compressed_video_thumbnails
