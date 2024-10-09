@@ -176,3 +176,4 @@ jobs:
           ls -l downloaded_video_thumbnails
           echo "Compressed Video Thumbnails:"
           ls -l compressed_video_thumbnails
+     
