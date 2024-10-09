@@ -153,7 +153,7 @@ jobs:
                   git config --global user.name "github-actions[bot]"
                   git add compressed_video_thumbnails/$filename || echo "No matching files"
                   git commit -m "Add compressed video thumbnail: $filename" || echo "No changes to commit"
-                  git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+                  git push https://x-access-token:${{ secrets.ACCESS_TOKEN_2_WEBRENDHQ }}@github.com/WebRendHQ/MacLellan-Frontend.git
 
                   # Remove the original downloaded thumbnail to save space
                   rm "downloaded_video_thumbnails/$filename"
