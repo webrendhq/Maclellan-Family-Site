@@ -28,8 +28,8 @@ function sanitizeFileName(fileName) {
 // Function to construct the relative URL for the compressed image
 async function getCompressedImageUrl(path) {
     const sanitizedPath = sanitizeFileName(path);  // Sanitize the path to replace spaces with underscores and lowercase
-    // Use a relative path to access the images from the compressed-images folder
-    const compressedImageUrl = `../compressed-images/${encodeURIComponent(sanitizedPath)}`;
+    // Use a relative path to access the images from the compressed_images folder
+    const compressedImageUrl = `../compressed_images/${encodeURIComponent(sanitizedPath)}`;
     return compressedImageUrl;
 }
 
