@@ -119,133 +119,149 @@ jobs:
               if [ "$tag" == "file" ]; then
                 mime_type=$(echo "$entry" | jq -r '.media_info.metadata.mime_type // empty')
                 echo "Found file with MIME type: $mime_type"
-                if [[ "$mime_type" == image/* ]]; then
-                  # Process Images
-                  path=$(echo "$entry" | jq -r '.path_lower')
-                  filename=$(basename "$path")
-                  echo "Processing image: $filename at path: $path"
+                
+                # Debugging: Log the entire entry (optional, remove if sensitive)
+                # echo "Entry details: $entry"
 
-                  # Replace spaces with underscores and preserve folder structure
-                  relative_path=$(dirname "$path" | sed 's|^/||') # Remove leading slash
-                  target_dir="compressed_images/$relative_path"
-                  mkdir -p "$target_dir"
-                  sanitized_filename=$(echo "$filename" | tr ' ' '_')
-                  compressed_image_path="$target_dir/$sanitized_filename"
-
-                  if [ ! -f "$compressed_image_path" ]; then
-                    echo "Generating temporary link for $path..."
-                    temp_link_response=$(curl -s -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
-                      --header "Authorization: Bearer $ACCESS_TOKEN" \
-                      --header "Content-Type: application/json" \
-                      --data "{\"path\": \"$path\"}")
-
-                    temp_link=$(echo "$temp_link_response" | jq -r '.link')
-                    if [ "$temp_link" != "null" ] && [ -n "$temp_link" ]; then
-                      echo "Downloading $filename from $temp_link"
-                      downloaded_image="downloaded_images/$sanitized_filename"
-                      curl -s -L "$temp_link" -o "$downloaded_image"
-                      if [ ! -f "$downloaded_image" ]; then
-                        echo "Failed to download $filename."
-                        continue
-                      fi
-
-                      # Determine the file extension
-                      extension="${sanitized_filename##*.}"
-                      extension_lower=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
-
-                      if [[ "$mime_type" == "image/heic" || "$mime_type" == "image/heif" ]]; then
-                        echo "Converting HEIC to JPEG for $filename"
-                        # Change extension to .jpg
-                        converted_filename="${sanitized_filename%.*}.jpg"
-                        converted_image="downloaded_images/$converted_filename"
-                        convert "$downloaded_image" "$converted_image" || { echo "Failed to convert HEIC to JPEG for $filename"; continue; }
-                        echo "Converted to JPEG: $converted_filename"
-
-                        # Compress the JPEG
-                        mogrify -path "$target_dir" -resize 50% "$converted_image" || echo "Error compressing $converted_filename"
-
-                        # Stage the compressed JPEG for commit
-                        git add "$target_dir/$converted_filename" || echo "No matching files to add for $converted_filename"
-
-                        # Remove the original and converted downloaded images to save space
-                        rm "$downloaded_image" "$converted_image"
-                      elif [[ "$extension_lower" == "png" ]]; then
-                        echo "Compressing PNG image: $sanitized_filename"
-
-                        # Compress PNG using pngquant (lossy) or optipng (lossless)
-                        # Here, we'll use both for maximum compression
-                        # First, use pngquant to reduce the number of colors
-                        pngquant --quality=65-80 --force --output "$downloaded_image" "$downloaded_image" || echo "pngquant failed for $sanitized_filename"
-
-                        # Then, further compress with optipng
-                        optipng -o7 "$downloaded_image" || echo "optipng failed for $sanitized_filename"
-
-                        # Move the compressed PNG to the target directory
-                        mv "$downloaded_image" "$compressed_image_path" || echo "Failed to move compressed PNG to $compressed_image_path"
-
-                        # Stage the compressed PNG for commit
-                        git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
-                      else
-                        # Compress other image formats normally (e.g., JPEG)
-                        echo "Compressing $filename..."
-                        mogrify -path "$target_dir" -resize 50% "$downloaded_image" || echo "Error compressing $filename"
-
-                        # Stage the compressed image for commit
-                        git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
-
-                        # Remove the original downloaded image to save space
-                        rm "$downloaded_image"
-                      fi
-                    else
-                      echo "Failed to get temporary link for $path"
-                    fi
-                  else
-                    echo "$compressed_image_path is already compressed, skipping."
-                  fi
-                elif [[ "$mime_type" == video/* ]]; then
-                  # Process Videos
-                  path=$(echo "$entry" | jq -r '.path_lower')
-                  video_filename=$(basename "$path")
-                  echo "Processing video: $video_filename at path: $path"
-
-                  # Define thumbnail filename
-                  thumbnail_filename="${video_filename%.*}-video.jpg"  # Use the video name with -video suffix
-                  thumbnail_filename=$(echo "$thumbnail_filename" | tr ' ' '_')  # Replace spaces with underscores
-                  relative_path=$(dirname "$path" | sed 's|^/||') # Remove leading slash
-                  target_dir="compressed_video_thumbnails/$relative_path"
-                  mkdir -p "$target_dir"
-                  compressed_thumbnail_path="$target_dir/$thumbnail_filename"
-
-                  if [ ! -f "$compressed_thumbnail_path" ]; then
-                    echo "Generating thumbnail for $path..."
-                    
-                    # Use get_thumbnail_v2 to get a high-quality thumbnail
-                    thumbnail_response=$(curl -s -X POST https://content.dropboxapi.com/2/files/get_thumbnail_v2 \
-                      --header "Authorization: Bearer $ACCESS_TOKEN" \
-                      --header "Dropbox-API-Arg: {\"resource\": {\"path\": \"$path\"}, \"format\": \"jpeg\", \"size\": \"w1024h768\"}" \
-                      --output "downloaded_video_thumbnails/$thumbnail_filename")
-
-                    if [ -f "downloaded_video_thumbnails/$thumbnail_filename" ]; then
-                      echo "Downloaded thumbnail: $thumbnail_filename"
-
-                      # Compress the thumbnail
-                      echo "Compressing thumbnail $thumbnail_filename..."
-                      mogrify -path "$target_dir" -resize 50% "downloaded_video_thumbnails/$thumbnail_filename" || echo "Error compressing thumbnail $thumbnail_filename"
-
-                      # Stage the compressed thumbnail for commit
-                      git add "$compressed_thumbnail_path" || echo "No matching files to add for $compressed_thumbnail_path"
-
-                      # Remove the original downloaded thumbnail to save space
-                      rm "downloaded_video_thumbnails/$thumbnail_filename"
-                    else
-                      echo "Failed to get thumbnail for $path"
-                    fi
-                  else
-                    echo "$compressed_thumbnail_path is already compressed, skipping."
-                  fi
-                else
-                  echo "Skipping non-image and non-video file."
+                # Ensure mime_type is not empty
+                if [ -z "$mime_type" ]; then
+                  echo "MIME type is empty for this file. Skipping."
+                  continue
                 fi
+
+                # Use case statement for better pattern matching
+                case "$mime_type" in
+                  image/*)
+                    # Process Images
+                    path=$(echo "$entry" | jq -r '.path_lower')
+                    filename=$(basename "$path")
+                    echo "Processing image: $filename at path: $path"
+
+                    # Replace spaces with underscores and preserve folder structure
+                    relative_path=$(dirname "$path" | sed 's|^/||') # Remove leading slash
+                    target_dir="compressed_images/$relative_path"
+                    mkdir -p "$target_dir"
+                    sanitized_filename=$(echo "$filename" | tr ' ' '_')
+                    compressed_image_path="$target_dir/$sanitized_filename"
+
+                    if [ ! -f "$compressed_image_path" ]; then
+                      echo "Generating temporary link for $path..."
+                      temp_link_response=$(curl -s -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
+                        --header "Authorization: Bearer $ACCESS_TOKEN" \
+                        --header "Content-Type: application/json" \
+                        --data "{\"path\": \"$path\"}")
+
+                      temp_link=$(echo "$temp_link_response" | jq -r '.link')
+                      if [ "$temp_link" != "null" ] && [ -n "$temp_link" ]; then
+                        echo "Downloading $filename from $temp_link"
+                        downloaded_image="downloaded_images/$sanitized_filename"
+                        curl -s -L "$temp_link" -o "$downloaded_image"
+                        if [ ! -f "$downloaded_image" ]; then
+                          echo "Failed to download $filename."
+                          continue
+                        fi
+
+                        # Determine the file extension
+                        extension="${sanitized_filename##*.}"
+                        extension_lower=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
+
+                        if [[ "$mime_type" == "image/heic" || "$mime_type" == "image/heif" ]]; then
+                          echo "Converting HEIC to JPEG for $filename"
+                          # Change extension to .jpg
+                          converted_filename="${sanitized_filename%.*}.jpg"
+                          converted_image="downloaded_images/$converted_filename"
+                          convert "$downloaded_image" "$converted_image" || { echo "Failed to convert HEIC to JPEG for $filename"; continue; }
+                          echo "Converted to JPEG: $converted_filename"
+
+                          # Compress the JPEG
+                          mogrify -path "$target_dir" -resize 50% "$converted_image" || echo "Error compressing $converted_filename"
+
+                          # Stage the compressed JPEG for commit
+                          git add "$target_dir/$converted_filename" || echo "No matching files to add for $converted_filename"
+
+                          # Remove the original and converted downloaded images to save space
+                          rm "$downloaded_image" "$converted_image"
+                        elif [[ "$extension_lower" == "png" ]]; then
+                          echo "Compressing PNG image: $sanitized_filename"
+
+                          # Compress PNG using pngquant (lossy) and optipng (lossless)
+                          # First, use pngquant to reduce the number of colors
+                          pngquant --quality=65-80 --force --output "$downloaded_image" "$downloaded_image" || { echo "pngquant failed for $sanitized_filename"; continue; }
+
+                          # Then, further compress with optipng
+                          optipng -o7 "$downloaded_image" || { echo "optipng failed for $sanitized_filename"; continue; }
+
+                          # Move the compressed PNG to the target directory
+                          mv "$downloaded_image" "$compressed_image_path" || { echo "Failed to move compressed PNG to $compressed_image_path"; continue; }
+
+                          echo "Compressed PNG: $compressed_image_path"
+
+                          # Stage the compressed PNG for commit
+                          git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
+                        else
+                          # Compress other image formats normally (e.g., JPEG)
+                          echo "Compressing $filename..."
+                          mogrify -path "$target_dir" -resize 50% "$downloaded_image" || echo "Error compressing $filename"
+
+                          # Stage the compressed image for commit
+                          git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
+
+                          # Remove the original downloaded image to save space
+                          rm "$downloaded_image"
+                        fi
+                      else
+                        echo "Failed to get temporary link for $path"
+                      fi
+                    else
+                      echo "$compressed_image_path is already compressed, skipping."
+                    fi
+                    ;;
+                  video/*)
+                    # Process Videos
+                    path=$(echo "$entry" | jq -r '.path_lower')
+                    video_filename=$(basename "$path")
+                    echo "Processing video: $video_filename at path: $path"
+
+                    # Define thumbnail filename
+                    thumbnail_filename="${video_filename%.*}-video.jpg"  # Use the video name with -video suffix
+                    thumbnail_filename=$(echo "$thumbnail_filename" | tr ' ' '_')  # Replace spaces with underscores
+                    relative_path=$(dirname "$path" | sed 's|^/||') # Remove leading slash
+                    target_dir="compressed_video_thumbnails/$relative_path"
+                    mkdir -p "$target_dir"
+                    compressed_thumbnail_path="$target_dir/$thumbnail_filename"
+
+                    if [ ! -f "$compressed_thumbnail_path" ]; then
+                      echo "Generating thumbnail for $path..."
+                      
+                      # Use get_thumbnail_v2 to get a high-quality thumbnail
+                      thumbnail_response=$(curl -s -X POST https://content.dropboxapi.com/2/files/get_thumbnail_v2 \
+                        --header "Authorization: Bearer $ACCESS_TOKEN" \
+                        --header "Dropbox-API-Arg: {\"resource\": {\"path\": \"$path\"}, \"format\": \"jpeg\", \"size\": \"w1024h768\"}" \
+                        --output "downloaded_video_thumbnails/$thumbnail_filename")
+
+                      if [ -f "downloaded_video_thumbnails/$thumbnail_filename" ]; then
+                        echo "Downloaded thumbnail: $thumbnail_filename"
+
+                        # Compress the thumbnail
+                        echo "Compressing thumbnail $thumbnail_filename..."
+                        mogrify -path "$target_dir" -resize 50% "downloaded_video_thumbnails/$thumbnail_filename" || echo "Error compressing thumbnail $thumbnail_filename"
+
+                        # Stage the compressed thumbnail for commit
+                        git add "$compressed_thumbnail_path" || echo "No matching files to add for $compressed_thumbnail_path"
+
+                        # Remove the original downloaded thumbnail to save space
+                        rm "downloaded_video_thumbnails/$thumbnail_filename"
+                      else
+                        echo "Failed to get thumbnail for $path"
+                      fi
+                    else
+                      echo "$compressed_thumbnail_path is already compressed, skipping."
+                    fi
+                    ;;
+                  *)
+                    echo "Skipping non-image and non-video file."
+                    ;;
+                esac
               fi
             done
 
