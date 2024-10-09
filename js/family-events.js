@@ -28,10 +28,19 @@ function sanitizeFileName(fileName) {
 // Function to construct the relative URL for the compressed image
 async function getCompressedImageUrl(path) {
     const sanitizedPath = sanitizeFileName(path);  // Sanitize the path to replace spaces with underscores and lowercase
+    const extension = sanitizedPath.split('.').pop().toLowerCase();
+    let compressedFilename = sanitizedPath;
+
+    // If the original file was HEIC, change the extension to JPG
+    if (extension === 'heic' || extension === 'heif') {
+        compressedFilename = sanitizedPath.replace(/\.(heic|heif)$/i, '.jpg');
+    }
+
     // Use a relative path to access the images from the compressed_images folder
-    const compressedImageUrl = `../compressed_images/${encodeURIComponent(sanitizedPath)}`;
+    const compressedImageUrl = `../compressed_images/${encodeURIComponent(compressedFilename)}`;
     return compressedImageUrl;
 }
+
 
 // Function to get the most recent image from a folder and construct the compressed image URL
 async function getMostRecentImageFromFolder(folderPath) {

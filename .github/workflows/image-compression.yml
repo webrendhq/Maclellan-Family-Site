@@ -20,11 +20,13 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Install Python, ImageMagick, ffmpeg, and jq
-      - name: Install Python, ImageMagick, ffmpeg, and jq
+      # Step 3: Install Python, ImageMagick with HEIC support, ffmpeg, and jq
+      - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip imagemagick jq ffmpeg
+          sudo apt-get install -y python3-pip imagemagick libheif-dev libheif-examples ffmpeg jq
+          # Verify HEIC support in ImageMagick
+          convert -list format | grep HEIC || echo "HEIC format not supported by ImageMagick."
 
       # Step 4: Refresh Dropbox Access Token
       - name: Refresh Dropbox Access Token
@@ -55,7 +57,7 @@ jobs:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
           set -e
-          set -x  # Enable command tracing
+          set -x  # Enable command tracing for debugging
           mkdir -p downloaded_images compressed_images
           echo "Listing all files in Dropbox and filtering images..."
 
@@ -141,15 +143,34 @@ jobs:
                         continue
                       fi
 
-                      # Compress the image
-                      echo "Compressing $filename..."
-                      mogrify -path "$target_dir" -resize 50% "$downloaded_image" || echo "Error compressing $filename"
+                      # Check if the file is HEIC
+                      if [[ "$mime_type" == "image/heic" || "$mime_type" == "image/heif" ]]; then
+                        echo "Converting HEIC to JPEG for $filename"
+                        # Change extension to .jpg
+                        converted_filename="${sanitized_filename%.*}.jpg"
+                        converted_image="downloaded_images/$converted_filename"
+                        convert "$downloaded_image" "$converted_image" || { echo "Failed to convert HEIC to JPEG for $filename"; continue; }
+                        echo "Compressed JPEG: $converted_filename"
+                        
+                        # Compress the JPEG
+                        mogrify -path "$target_dir" -resize 50% "$converted_image" || echo "Error compressing $converted_filename"
 
-                      # Stage the compressed image for commit
-                      git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
+                        # Stage the compressed JPEG for commit
+                        git add "$target_dir/$converted_filename" || echo "No matching files to add for $converted_filename"
 
-                      # Remove the original downloaded image to save space
-                      rm "$downloaded_image"
+                        # Remove the original and converted downloaded images to save space
+                        rm "$downloaded_image" "$converted_image"
+                      else
+                        # Compress other image formats normally
+                        echo "Compressing $filename..."
+                        mogrify -path "$target_dir" -resize 50% "$downloaded_image" || echo "Error compressing $filename"
+
+                        # Stage the compressed image for commit
+                        git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
+
+                        # Remove the original downloaded image to save space
+                        rm "$downloaded_image"
+                      fi
                     else
                       echo "Failed to get temporary link for $path"
                     fi
@@ -176,6 +197,10 @@ jobs:
 
           echo "Completed listing and processing image files."
 
+          # Log Git status before committing
+          echo "Staging completed. Current Git status:"
+          git status
+
           # Commit and push all compressed images at once
           if ! git diff --cached --exit-code; then
             git commit -m "Add compressed images from Dropbox"
@@ -190,7 +215,7 @@ jobs:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
           set -e
-          set -x  # Enable command tracing
+          set -x  # Enable command tracing for debugging
           mkdir -p downloaded_video_thumbnails compressed_video_thumbnails
           echo "Listing all files in Dropbox and filtering videos..."
 
@@ -305,6 +330,10 @@ jobs:
           done
 
           echo "Completed listing and processing video thumbnails."
+
+          # Log Git status before committing
+          echo "Staging completed. Current Git status:"
+          git status
 
           # Commit and push all compressed thumbnails at once
           if ! git diff --cached --exit-code; then
