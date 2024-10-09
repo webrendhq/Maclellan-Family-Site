@@ -1,4 +1,4 @@
-name: Refresh Token, Compress, and Upload Images & Video Thumbnails Incrementally
+name: Refresh Token, Compress, and Upload Images & Video Thumbnails
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Install Python, ImageMagick with HEIC support, ffmpeg, and jq
+      # Step 3: Install Dependencies (ImageMagick with HEIC support)
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -49,24 +49,25 @@ jobs:
             echo "Failed to retrieve access token."
             exit 1
           fi
-          echo "::set-output name=access_token::$ACCESS_TOKEN"
+          # Update: Use GITHUB_OUTPUT instead of set-output
+          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
-      # Step 5: List and process all image files with pagination
-      - name: List and process all image files
+      # Step 5: List and Process All Image and Video Files
+      - name: List and process all media files
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
           set -e
           set -x  # Enable command tracing for debugging
-          mkdir -p downloaded_images compressed_images
-          echo "Listing all files in Dropbox and filtering images..."
+          mkdir -p downloaded_images compressed_images downloaded_video_thumbnails compressed_video_thumbnails
+          echo "Listing all files in Dropbox and filtering images and videos..."
 
-          # Initialize variables for pagination
+          # Initialize variables
           cursor=""
           has_more=true
           page=1  # To track the number of pages processed
 
-          # Configure Git once before processing
+          # Configure Git
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
 
@@ -115,6 +116,7 @@ jobs:
                 mime_type=$(echo "$entry" | jq -r '.media_info.metadata.mime_type // empty')
                 echo "Found file with MIME type: $mime_type"
                 if [[ "$mime_type" == image/* ]]; then
+                  # Process Images
                   path=$(echo "$entry" | jq -r '.path_lower')
                   filename=$(basename "$path")
                   echo "Processing image: $filename at path: $path"
@@ -177,106 +179,13 @@ jobs:
                   else
                     echo "$compressed_image_path is already compressed, skipping."
                   fi
-                else
-                  echo "Skipping non-image file."
-                fi
-              else
-                echo "Skipping non-file entry with tag: $tag"
-              fi
-            done
-
-            # Increment page counter
-            page=$((page + 1))
-
-            # Safety check to prevent infinite loops during debugging
-            if [ "$page" -gt 100 ]; then
-              echo "Reached maximum page limit (100). Exiting loop to prevent infinite execution."
-              break
-            fi
-          done
-
-          echo "Completed listing and processing image files."
-
-          # Log Git status before committing
-          echo "Staging completed. Current Git status:"
-          git status
-
-          # Commit and push all compressed images at once
-          if ! git diff --cached --exit-code; then
-            git commit -m "Add compressed images from Dropbox"
-            git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-          else
-            echo "No new compressed images to commit."
-          fi
-
-      # Step 6: Search and process video thumbnails incrementally using get_thumbnail_v2
-      - name: Search and process video thumbnails incrementally
-        env:
-          ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
-        run: |
-          set -e
-          set -x  # Enable command tracing for debugging
-          mkdir -p downloaded_video_thumbnails compressed_video_thumbnails
-          echo "Listing all files in Dropbox and filtering videos..."
-
-          # Initialize variables for pagination
-          cursor=""
-          has_more=true
-          page=1  # To track the number of pages processed
-
-          # Configure Git once before processing
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-
-          while [ "$has_more" = true ]; do
-            echo "Processing video page $page..."
-            if [ -z "$cursor" ]; then
-              # Initial call to list_folder
-              response=$(curl -s -X POST https://api.dropboxapi.com/2/files/list_folder \
-                --header "Authorization: Bearer $ACCESS_TOKEN" \
-                --header "Content-Type: application/json" \
-                --data '{
-                  "path": "",
-                  "recursive": true,
-                  "include_media_info": true,
-                  "include_deleted": false
-                }')
-            else
-              # Subsequent calls to list_folder/continue
-              response=$(curl -s -X POST https://api.dropboxapi.com/2/files/list_folder/continue \
-                --header "Authorization: Bearer $ACCESS_TOKEN" \
-                --header "Content-Type: application/json" \
-                --data "{\"cursor\": \"$cursor\"}")
-            fi
-
-            # Log the response status
-            echo "Received response for video page $page."
-
-            # Check for errors in the response
-            error=$(echo "$response" | jq -r '.error // empty')
-            if [ -n "$error" ]; then
-              echo "Dropbox API error: $error"
-              exit 1
-            fi
-
-            # Extract entries and cursor
-            entries=$(echo "$response" | jq -c '.entries[]?')
-            cursor=$(echo "$response" | jq -r '.cursor')
-            has_more=$(echo "$response" | jq -r '.has_more')
-
-            echo "Video Page $page: has_more=$has_more, cursor=$cursor"
-
-            # Process each entry
-            echo "$entries" | while read -r entry; do
-              tag=$(echo "$entry" | jq -r '.[".tag"]')
-              if [ "$tag" == "file" ]; then
-                mime_type=$(echo "$entry" | jq -r '.media_info.metadata.mime_type // empty')
-                echo "Found file with MIME type: $mime_type"
-                if [[ "$mime_type" == video/* ]]; then
+                elif [[ "$mime_type" == video/* ]]; then
+                  # Process Videos
                   path=$(echo "$entry" | jq -r '.path_lower')
                   video_filename=$(basename "$path")
                   echo "Processing video: $video_filename at path: $path"
 
+                  # Define thumbnail filename
                   thumbnail_filename="${video_filename%.*}-video.jpg"  # Use the video name with -video suffix
                   thumbnail_filename=$(echo "$thumbnail_filename" | tr ' ' '_')  # Replace spaces with underscores
                   relative_path=$(dirname "$path" | sed 's|^/||') # Remove leading slash
@@ -312,36 +221,27 @@ jobs:
                     echo "$compressed_thumbnail_path is already compressed, skipping."
                   fi
                 else
-                  echo "Skipping non-video file."
+                  echo "Skipping non-image and non-video file."
                 fi
-              else
-                echo "Skipping non-file entry with tag: $tag"
-              fi
+              done
+
+              # Increment page counter
+              page=$((page + 1))
             done
 
-            # Increment page counter
-            page=$((page + 1))
+            echo "Completed listing and processing all media files."
 
-            # Safety check to prevent infinite loops during debugging
-            if [ "$page" -gt 100 ]; then
-              echo "Reached maximum page limit (100). Exiting loop to prevent infinite execution."
-              break
+            # Log Git status before committing
+            echo "Staging completed. Current Git status:"
+            git status
+
+            # Commit and push all compressed images and thumbnails at once
+            if ! git diff --cached --exit-code; then
+              git commit -m "Add compressed images and video thumbnails from Dropbox"
+              git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+            else
+              echo "No new compressed media to commit."
             fi
-          done
-
-          echo "Completed listing and processing video thumbnails."
-
-          # Log Git status before committing
-          echo "Staging completed. Current Git status:"
-          git status
-
-          # Commit and push all compressed thumbnails at once
-          if ! git diff --cached --exit-code; then
-            git commit -m "Add compressed video thumbnails from Dropbox"
-            git push https://x-access-token:${{ secrets.ACTIONS_DEPLOY_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-          else
-            echo "No new compressed video thumbnails to commit."
-          fi
 
       # Debug Step: Check if images and thumbnails were downloaded and compressed
       - name: List downloaded and compressed media

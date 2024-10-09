@@ -9,10 +9,10 @@ onAuthStateChanged(auth, (user) => {
         window.location.href = '/sign-in.html';
     }
 });
- 
+
 // Function to get URL parameters
 function getUrlParameter(name) {
-    name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
+    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
     const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
     const results = regex.exec(window.location.search);
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
@@ -40,7 +40,6 @@ async function getCompressedImageUrl(path) {
     const compressedImageUrl = `../compressed_images/${encodeURIComponent(compressedFilename)}`;
     return compressedImageUrl;
 }
-
 
 // Function to get the most recent image from a folder and construct the compressed image URL
 async function getMostRecentImageFromFolder(folderPath) {
@@ -73,7 +72,7 @@ async function getMostRecentImageFromFolder(folderPath) {
             entry['.tag'] === 'file' &&
             (
                 (entry.media_info && entry.media_info['.tag'] === 'photo') ||
-                /\.(jpg|jpeg|png|gif|heic)$/i.test(entry.name)
+                /\.(jpg|jpeg|png|gif|heic|heif)$/i.test(entry.name)
             )
         );
 
