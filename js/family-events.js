@@ -9,10 +9,10 @@ onAuthStateChanged(auth, (user) => {
         window.location.href = '/sign-in.html';
     }
 });
-
+ 
 // Function to get URL parameters
 function getUrlParameter(name) {
-    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+    name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
     const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
     const results = regex.exec(window.location.search);
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
@@ -28,16 +28,8 @@ function sanitizeFileName(fileName) {
 // Function to construct the relative URL for the compressed image
 async function getCompressedImageUrl(path) {
     const sanitizedPath = sanitizeFileName(path);  // Sanitize the path to replace spaces with underscores and lowercase
-    const extension = sanitizedPath.split('.').pop().toLowerCase();
-    let compressedFilename = sanitizedPath;
-
-    // If the original file was HEIC, change the extension to JPG
-    if (extension === 'heic' || extension === 'heif') {
-        compressedFilename = sanitizedPath.replace(/\.(heic|heif)$/i, '.jpg');
-    }
-
     // Use a relative path to access the images from the compressed_images folder
-    const compressedImageUrl = `../compressed_images/${encodeURIComponent(compressedFilename)}`;
+    const compressedImageUrl = `../compressed_images/${encodeURIComponent(sanitizedPath)}`;
     return compressedImageUrl;
 }
 
@@ -72,7 +64,7 @@ async function getMostRecentImageFromFolder(folderPath) {
             entry['.tag'] === 'file' &&
             (
                 (entry.media_info && entry.media_info['.tag'] === 'photo') ||
-                /\.(jpg|jpeg|png|gif|heic|heif)$/i.test(entry.name)
+                /\.(jpg|jpeg|png|gif|heic)$/i.test(entry.name)
             )
         );
 
