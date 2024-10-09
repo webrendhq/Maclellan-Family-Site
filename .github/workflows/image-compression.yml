@@ -106,7 +106,7 @@ jobs:
           ACCESS_TOKEN_2_WEBRENDHQ: ${{ secrets.ACCESS_TOKEN_2_WEBRENDHQ }}  # Ensure this PAT has write access
         run: |
           git commit -m "Add compressed images" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.ACCESS_TOKEN_2_WEBRENDHQ }}@github.com/WebRendHQ/MacLellan-Frontend.git
+          git push https://x-access-token:${{ secrets.ACCESS_TOKEN_2_WEBRENDHQ }}@github.com/WebRendHQ/MacLellanFamily.com.git
 
       # Step 8: Process Video Thumbnails
       - name: Search and Process Video Thumbnails Incrementally
