@@ -20,13 +20,17 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 3: Install Dependencies (ImageMagick with HEIC support)
+      # Step 3: Install Dependencies (ImageMagick with HEIC support and PNG compression tools)
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip imagemagick libheif-dev libheif-examples ffmpeg jq
+          sudo apt-get install -y python3-pip imagemagick libheif-dev libheif-examples ffmpeg jq pngquant optipng
           # Verify HEIC support in ImageMagick
           convert -list format | grep HEIC || echo "HEIC format not supported by ImageMagick."
+          # Verify pngquant installation
+          pngquant --version || echo "pngquant not installed correctly."
+          # Verify optipng installation
+          optipng -version || echo "optipng not installed correctly."
 
       # Step 4: Refresh Dropbox Access Token
       - name: Refresh Dropbox Access Token
@@ -145,15 +149,18 @@ jobs:
                         continue
                       fi
 
-                      # Check if the file is HEIC
+                      # Determine the file extension
+                      extension="${sanitized_filename##*.}"
+                      extension_lower=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
+
                       if [[ "$mime_type" == "image/heic" || "$mime_type" == "image/heif" ]]; then
                         echo "Converting HEIC to JPEG for $filename"
                         # Change extension to .jpg
                         converted_filename="${sanitized_filename%.*}.jpg"
                         converted_image="downloaded_images/$converted_filename"
                         convert "$downloaded_image" "$converted_image" || { echo "Failed to convert HEIC to JPEG for $filename"; continue; }
-                        echo "Compressed JPEG: $converted_filename"
-                        
+                        echo "Converted to JPEG: $converted_filename"
+
                         # Compress the JPEG
                         mogrify -path "$target_dir" -resize 50% "$converted_image" || echo "Error compressing $converted_filename"
 
@@ -162,8 +169,24 @@ jobs:
 
                         # Remove the original and converted downloaded images to save space
                         rm "$downloaded_image" "$converted_image"
+                      elif [[ "$extension_lower" == "png" ]]; then
+                        echo "Compressing PNG image: $sanitized_filename"
+
+                        # Compress PNG using pngquant (lossy) or optipng (lossless)
+                        # Here, we'll use both for maximum compression
+                        # First, use pngquant to reduce the number of colors
+                        pngquant --quality=65-80 --force --output "$downloaded_image" "$downloaded_image" || echo "pngquant failed for $sanitized_filename"
+
+                        # Then, further compress with optipng
+                        optipng -o7 "$downloaded_image" || echo "optipng failed for $sanitized_filename"
+
+                        # Move the compressed PNG to the target directory
+                        mv "$downloaded_image" "$compressed_image_path" || echo "Failed to move compressed PNG to $compressed_image_path"
+
+                        # Stage the compressed PNG for commit
+                        git add "$compressed_image_path" || echo "No matching files to add for $compressed_image_path"
                       else
-                        # Compress other image formats normally
+                        # Compress other image formats normally (e.g., JPEG)
                         echo "Compressing $filename..."
                         mogrify -path "$target_dir" -resize 50% "$downloaded_image" || echo "Error compressing $filename"
 
