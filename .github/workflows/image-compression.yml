@@ -239,7 +239,7 @@ jobs:
           # Commit and push all compressed images and thumbnails at once
           if ! git diff --cached --exit-code; then
             git commit -m "Add compressed images and video thumbnails from Dropbox"
-            git push https://x-access-token:${{ secrets.ACCESS_TOKEN_2_WEBRENDHQ }}@github.com/WebRendHQ/MaclellanFamily.com-Images-and-Video-Thumbnails.git
+            git push https://x-access-token:${{ secrets.ACCESS_TOKEN_2_WEBRENDHQ }}@github.com/kevinveragit/MacLellan-Frontend.git
           else
             echo "No new compressed media to commit."
           fi
