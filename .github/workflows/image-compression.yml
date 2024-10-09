@@ -56,6 +56,25 @@ jobs:
             filename=$(echo "$filename" | tr ' ' '_')  # Replace spaces with underscores
             
             if [ ! -f "compressed_images/$filename" ]; then
+              echo "Checking metadata for $path..."
+              metadata_response=$(curl -s -X POST https://api.dropboxapi.com/2/files/get_metadata \
+                --header "Authorization: Bearer $ACCESS_TOKEN" \
+                --header "Content-Type: application/json" \
+                --data "{\"path\": \"$path\"}")
+              
+              # Extract file size using jq
+              file_size=$(echo "$metadata_response" | jq -r '.size // empty')
+              
+              if [ -z "$file_size" ]; then
+                echo "Failed to get file size for $path, skipping"
+                return
+              fi
+
+              if [ "$file_size" -gt 100000000 ]; then  # 100MB in bytes
+                echo "File $filename is too large ($file_size bytes), skipping"
+                return
+              fi
+
               echo "Generating temporary link for $path..."
               temp_link_response=$(curl -X POST https://api.dropboxapi.com/2/files/get_temporary_link \
                 --header "Authorization: Bearer $ACCESS_TOKEN" \
