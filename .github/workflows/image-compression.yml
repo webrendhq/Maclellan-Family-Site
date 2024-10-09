@@ -49,7 +49,7 @@ jobs:
             echo "Failed to retrieve access token."
             exit 1
           fi
-          # Update: Use GITHUB_OUTPUT instead of set-output
+          # Use GITHUB_OUTPUT to set the access_token output
           echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
       # Step 5: List and Process All Image and Video Files
@@ -57,8 +57,8 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ steps.refresh_token.outputs.access_token }}
         run: |
-          set -e
-          set -x  # Enable command tracing for debugging
+          set -e  # Exit on error
+          # Removed set -x to prevent secrets from being printed
           mkdir -p downloaded_images compressed_images downloaded_video_thumbnails compressed_video_thumbnails
           echo "Listing all files in Dropbox and filtering images and videos..."
 
@@ -223,25 +223,26 @@ jobs:
                 else
                   echo "Skipping non-image and non-video file."
                 fi
-              done
-
-              # Increment page counter
-              page=$((page + 1))
+              fi
             done
 
-            echo "Completed listing and processing all media files."
+            # Increment page counter
+            page=$((page + 1))
+          done
 
-            # Log Git status before committing
-            echo "Staging completed. Current Git status:"
-            git status
+          echo "Completed listing and processing all media files."
 
-            # Commit and push all compressed images and thumbnails at once
-            if ! git diff --cached --exit-code; then
-              git commit -m "Add compressed images and video thumbnails from Dropbox"
-              git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
-            else
-              echo "No new compressed media to commit."
-            fi
+          # Log Git status before committing
+          echo "Staging completed. Current Git status:"
+          git status
+
+          # Commit and push all compressed images and thumbnails at once
+          if ! git diff --cached --exit-code; then
+            git commit -m "Add compressed images and video thumbnails from Dropbox"
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/kevinveragit/MacLellan-Frontend.git
+          else
+            echo "No new compressed media to commit."
+          fi
 
       # Debug Step: Check if images and thumbnails were downloaded and compressed
       - name: List downloaded and compressed media
