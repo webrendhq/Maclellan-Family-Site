@@ -352,6 +352,7 @@ async function getThumbnailBlob(path, retryCount = 0) {
     try {
         const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
             method: 'POST',
+            mode: 'no-cors',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Dropbox-API-Arg': JSON.stringify({
@@ -413,6 +414,7 @@ async function getMostRecentImageFromFolder(folderPath) {
     try {
         const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
             method: 'POST',
+            mode: 'no-cors',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
@@ -565,6 +567,7 @@ async function listExactYearFolders() {
 
             const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
                 method: 'POST',
+                mode: 'no-cors',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
@@ -619,6 +622,7 @@ async function listExactYearFolders() {
             // Fetch contents for all folders in parallel
             const folderContentsPromises = folderPaths.map(folderPath => fetch('https://api.dropboxapi.com/2/files/list_folder', {
                 method: 'POST',
+                mode: 'no-cors',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
