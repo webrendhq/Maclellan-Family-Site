@@ -1,11 +1,12 @@
 // Import necessary functions and tokens
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
-
 import { auth, onAuthStateChanged, db } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js';
 
+// Initialize admin flag
 let isAdmin = false;
 
+// Authentication State Listener
 onAuthStateChanged(auth, async (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
@@ -19,6 +20,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
+// Function to create a delete button for admin users
 function createDeleteButton(file) {
     const deleteButton = document.createElement('button');
     deleteButton.innerHTML = '&#10006;'; // 'x' character
@@ -48,6 +50,7 @@ function createDeleteButton(file) {
     return deleteButton;
 }
 
+// Function to show a delete confirmation modal
 function showDeleteConfirmationModal(file) {
     const modal = document.createElement('div');
     modal.style.cssText = `
@@ -91,6 +94,7 @@ function showDeleteConfirmationModal(file) {
     };
 }
 
+// Function to delete a file from Dropbox
 async function deleteFile(file) {
     try {
         await refreshDropboxAccessToken();
@@ -133,7 +137,88 @@ function getUrlParameter(name) {
 const year = getUrlParameter('year');
 const path = getUrlParameter('path');
 
-// Modified getThumbnailBlob function to always use 'w64h64'
+// Inject necessary CSS styles
+function injectStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Container for each file item */
+        .file-item {
+            position: relative;
+            transform: scale(1); /* Reduce size to 0.25 times */
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+            overflow: hidden; /* Ensure child elements don't overflow */
+            cursor: pointer; /* Indicate clickable item */
+            width: 200px; /* Adjust width as needed */
+            height: 200px; /* Adjust height as needed */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
+        /* Hover effect with box shadow and slight scale-up */
+        .file-item:hover {
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            transform: scale(1.10); /* Slightly scale up on hover */
+        }
+
+        /* Image styling with blur filter */
+        .file-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(4px); /* Adjust blur level as needed */
+            transition: filter 0.3s ease;
+            border-radius: 8px;
+        }
+
+        /* Remove blur on hover for better visibility */
+        .file-item:hover img {
+            filter: blur(0);
+        }
+
+        /* Caption styling */
+        .file-item .caption {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800; /* Extra bold */
+            font-size: 1.2em; /* Adjust as needed */
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none; /* Ensure caption doesn't block hover */
+            padding: 10px; /* Add some padding for better readability */
+            background: rgba(0, 0, 0, 0.3); /* Optional: add semi-transparent background for better text visibility */
+        }
+
+        /* Show caption on hover */
+        .file-item:hover .caption {
+            opacity: 1;
+        }
+
+        /* Ensure the grid is responsive */
+        #event-n-year-bento-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px; /* Adjust spacing between items */
+            justify-content: center; /* Center items horizontally */
+            padding: 20px; /* Add some padding around the grid */
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Call the function to inject styles
+injectStyles();
+
+// Modified getThumbnailBlob function to always use 'w128h128' and implement caching
 async function getThumbnailBlob(filePath) {
     const size = 'w128h128'; // Fixed size
     const cacheKey = `${filePath}_${size}`;
@@ -160,7 +245,7 @@ async function getThumbnailBlob(filePath) {
                         ".tag": "jpeg"
                     },
                     size: {
-                        ".tag": size // Use the fixed size
+                        ".tag": "w128h128" // Use the fixed size
                     },
                     mode: {
                         ".tag": "strict"
@@ -168,7 +253,7 @@ async function getThumbnailBlob(filePath) {
                 }),
                 'Content-Type': 'text/plain; charset=utf-8' // Set to accepted value
             },
-            body: null // Empty body
+            body: '' // Empty body
         });
 
         if (!response.ok) {
@@ -187,7 +272,19 @@ async function getThumbnailBlob(filePath) {
     }
 }
 
-// Modified getThumbnails function to only fetch 'w64h64' size
+// Function to create object URL for the thumbnail
+async function getThumbnail(filePath) {
+    const blob = await getThumbnailBlob(filePath);
+    if (blob) {
+        const url = URL.createObjectURL(blob);
+        return url;
+    } else {
+        console.error(`Failed to fetch thumbnail for path ${filePath}`);
+        return null;
+    }
+}
+
+// Function to get all thumbnails (currently only 'w128h128')
 async function getThumbnails(filePath) {
     const size = 'w128h128'; // Only one size
     const thumbnails = {};
@@ -225,7 +322,7 @@ window.onclick = function(event) {
 };
 
 // Function to open the modal and display the content
-function openModal(tempLink, fileName) {
+function openModal(tempLink, fileName, folderName) {
     // Clear previous content
     modalBody.innerHTML = '';
 
@@ -261,13 +358,24 @@ function openModal(tempLink, fileName) {
     downloadLink.href = tempLink;
     downloadLink.download = fileName;
 
+    // Optionally, display the folder name as a caption in the modal
+    const folderCaption = document.createElement('div');
+    folderCaption.style.marginTop = '10px';
+    folderCaption.style.color = '#fff';
+    folderCaption.style.fontWeight = '800';
+    folderCaption.textContent = `Folder: ${folderName}`;
+    modalBody.appendChild(folderCaption);
+
     // Show the modal
     modal.style.display = 'block';
 }
 
-// Main function to list images and videos in a folder
-// Main function to list images and videos in a folder
-// Main function to list images and videos in a folder
+// Function to extract folder name from path
+function extractFolderName(path) {
+    const parts = path.split('/');
+    return parts[parts.length - 1] || 'Unnamed Folder';
+}
+
 // Main function to list images and videos in a folder
 async function listImagesAndVideosInFolder() {
     if (!year || !path) {
@@ -326,97 +434,98 @@ async function listImagesAndVideosInFolder() {
         const addedFiles = new Set();
 
         if (mediaFiles.length > 0) {
-            for (const file of mediaFiles) {
+            // Fetch thumbnails in parallel for better performance
+            const thumbnailPromises = mediaFiles.map(file => getThumbnails(file.path_lower).then(thumbnails => ({
+                file,
+                thumbnails
+            })));
+            const filesWithThumbnails = await Promise.all(thumbnailPromises);
+
+            // Filter out files without thumbnails
+            const validFiles = filesWithThumbnails.filter(item => item.thumbnails && Object.keys(item.thumbnails).length > 0);
+
+            // Create DOM elements for all valid files
+            validFiles.forEach(({ file, thumbnails }) => {
                 // Check if the file has already been added
                 if (addedFiles.has(file.path_lower)) {
                     console.log(`Skipping duplicate file: ${file.path_lower}`);
-                    continue;
+                    return;
                 }
 
-                // Get thumbnails of 'w128h128' size
-                const thumbnails = await getThumbnails(file.path_lower);
+                // Create an 'a' element
+                const fileLink = document.createElement('a');
+                fileLink.className = 'file-item';
+                fileLink.href = '#'; // Prevent default navigation
+                fileLink.style.position = 'relative'; // For positioning the delete button
+                fileLink.dataset.path = file.path_lower; // Add data attribute for easy selection
 
-                if (thumbnails && Object.keys(thumbnails).length > 0) {
-                    // Create an 'a' element
-                    const fileLink = document.createElement('a');
-                    fileLink.className = 'file-item';
-                    fileLink.href = '#'; // Prevent default navigation
-                    fileLink.style.position = 'relative'; // For positioning the delete button
-                    fileLink.dataset.path = file.path_lower; // Add data attribute for easy selection
+                // Event listener for opening the modal
+                fileLink.addEventListener('click', async function(event) {
+                    event.preventDefault();
 
-                    // Event listener for opening the modal
-                    fileLink.addEventListener('click', async function(event) {
-                        event.preventDefault();
+                    // Get a temporary link to the file
+                    let tempLink = '#'; // Default tempLink in case temporary link cannot be obtained
 
-                        // Get a temporary link to the file
-                        let tempLink = '#'; // Default tempLink in case temporary link cannot be obtained
+                    try {
+                        const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                path: file.path_lower
+                            })
+                        });
 
-                        try {
-                            const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${accessToken}`,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    path: file.path_lower
-                                })
-                            });
-
-                            if (tempLinkResponse.ok) {
-                                const tempLinkData = await tempLinkResponse.json();
-                                tempLink = tempLinkData.link;
-                            } else {
-                                const errorText = await tempLinkResponse.text();
-                                console.error(`Error getting temporary link: ${errorText}`);
-                            }
-                        } catch (error) {
-                            console.error('Error getting temporary link:', error);
+                        if (tempLinkResponse.ok) {
+                            const tempLinkData = await tempLinkResponse.json();
+                            tempLink = tempLinkData.link;
+                        } else {
+                            const errorText = await tempLinkResponse.text();
+                            console.error(`Error getting temporary link: ${errorText}`);
                         }
-
-                        // Open the modal and display the content
-                        openModal(tempLink, file.name);
-                    });
-
-                    // Create an img element with fixed size
-                    const img = document.createElement('img');
-                    img.alt = file.name;
-                    img.loading = 'lazy'; // Implement lazy loading
-
-                    // Set the styles to enforce 128x128 resolution
-                    img.style.width = '100%';
-                    img.style.height = 'auto';
-                    img.style.objectFit = 'cover';
-                    img.style.borderRadius = '4px';
-
-                    // Set the src to the 'w128h128' thumbnail
-                    img.src = thumbnails['w128h128'];
-
-                    // Append the image to the file link
-                    fileLink.appendChild(img);
-
-                    // Add delete button for admin users
-                    if (isAdmin) {
-                        const deleteButton = createDeleteButton(file);
-                        fileLink.appendChild(deleteButton);
+                    } catch (error) {
+                        console.error('Error getting temporary link:', error);
                     }
 
-                    // Optionally, add a caption
-                    const caption = document.createElement('p');
-                    caption.textContent = file.name;
-                    fileLink.appendChild(caption);
+                    // Open the modal and display the content
+                    openModal(tempLink, file.name, extractFolderName(path));
+                });
 
-                    // Append the file link to the grid
-                    eventBentoGrid.appendChild(fileLink);
+                // Create an img element with fixed size
+                const img = document.createElement('img');
+                img.alt = extractFolderName(path); // Use folder name as alt text
+                img.loading = 'lazy'; // Implement lazy loading
 
-                    // Mark this file as added
-                    addedFiles.add(file.path_lower);  // Add the file path to the Set
-                } else {
-                    console.log(`File skipped (no thumbnail): ${file.path_display}`);
+                // Set the src to the 'w128h128' thumbnail
+                img.src = thumbnails['w128h128'];
+
+                // Append the image to the file link
+                fileLink.appendChild(img);
+
+                // Add delete button for admin users
+                if (isAdmin) {
+                    const deleteButton = createDeleteButton(file);
+                    fileLink.appendChild(deleteButton);
                 }
-            }
 
-            // Initialize Isotope after appending all folder items
+                // Create a caption element with the folder's name
+                const caption = document.createElement('div');
+                caption.className = 'caption';
+                caption.textContent = extractFolderName(path); // Use folder name for caption
+
+                // Append the caption to the file link
+                fileLink.appendChild(caption);
+
+                // Append the file link to the grid
+                eventBentoGrid.appendChild(fileLink);
+
+                // Mark this file as added
+                addedFiles.add(file.path_lower);  // Add the file path to the Set
+            });
+
+            // Initialize Isotope after appending all file items
             const iso = new Isotope(eventBentoGrid, {
                 itemSelector: '.file-item',
                 layoutMode: 'masonry',
@@ -446,11 +555,12 @@ async function listImagesAndVideosInFolder() {
 
         const errorDiv = document.createElement('div');
         errorDiv.textContent = `Error: ${error.message}`;
-        document.getElementById('event-n-year-bento-grid').appendChild(errorDiv);
+        const eventBentoGrid = document.getElementById('event-n-year-bento-grid');
+        if (eventBentoGrid) {
+            eventBentoGrid.appendChild(errorDiv);
+        }
     }
 }
 
-
+// Call the main function to list images and videos
 listImagesAndVideosInFolder();
-
- 

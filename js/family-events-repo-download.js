@@ -1,80 +1,39 @@
-
 // Import necessary functions and tokens
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+
+// Ensure user is authenticated
 onAuthStateChanged(auth, (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
         window.location.href = '/sign-in.html';
     }
-    // If a user is signed in, do nothing and allow access to the current page.
 });
-
-  
+ 
 // Function to get URL parameters
 function getUrlParameter(name) {
     name = name.replace(/[\\[]/, '\\[').replace(/[\\]]/, '\\]');
-    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    var results = regex.exec(window.location.search);
+    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    const results = regex.exec(window.location.search);
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
 const year = getUrlParameter('year');
 
-// Modified getThumbnailBlob to always use 'w64h64' and implement caching
-async function getThumbnailBlob(path) {
-    const size = 'w128h128'; // Enforce 64x64 resolution
-    const cacheKey = `${path}_${size}`;
-    const cache = await caches.open('thumbnails-cache');
-
-    // Check if the image is already in the cache
-    const cachedResponse = await cache.match(cacheKey);
-    if (cachedResponse) {
-        return await cachedResponse.blob();
-    }
-
-    // If not in cache, fetch the image
-    try {
-        const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Dropbox-API-Arg': JSON.stringify({
-                    path: path,
-                    format: 'jpeg',
-                    size: size // Always use 'w64h64'
-                })
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Clone the response so we can store it in the cache
-        const responseClone = response.clone();
-        cache.put(cacheKey, responseClone);
-
-        return await response.blob();
-    } catch (error) {
-        console.error('Error fetching thumbnail:', error);
-        return null;
-    }
+// Function to sanitize file names: replace spaces with underscores and convert to lowercase
+function sanitizeFileName(fileName) {
+    return fileName.replace(/\s+/g, '_').toLowerCase();
 }
 
-// Function to create object URL for the thumbnail
-async function getThumbnail(path) {
-    const blob = await getThumbnailBlob(path);
-    if (blob) {
-        const url = URL.createObjectURL(blob);
-        return url;
-    } else {
-        console.error(`Failed to fetch thumbnail for path ${path}`);
-        return null;
-    }
+// Function to construct the relative URL for the compressed image
+async function getCompressedImageUrl(path) {
+    const sanitizedPath = sanitizeFileName(path);  // Sanitize the path to replace spaces with underscores and lowercase
+    // Use a relative path to access the images from the compressed_images folder
+    const compressedImageUrl = `../compressed_images/${encodeURIComponent(sanitizedPath)}`;
+    return compressedImageUrl;
 }
 
-// Function to get the most recent image from a folder and its thumbnail
+// Function to get the most recent image from a folder and construct the compressed image URL
 async function getMostRecentImageFromFolder(folderPath) {
     try {
         const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
@@ -86,7 +45,7 @@ async function getMostRecentImageFromFolder(folderPath) {
             body: JSON.stringify({
                 path: folderPath,
                 recursive: false,
-                include_media_info: true, // Enable media info
+                include_media_info: true,
                 include_deleted: false,
                 include_has_explicit_shared_members: false,
                 include_mounted_folders: false,
@@ -120,11 +79,11 @@ async function getMostRecentImageFromFolder(folderPath) {
 
         const mostRecentImage = imageFiles[0];
 
-        // Get the thumbnail
-        const thumbnailUrl = await getThumbnail(mostRecentImage.path_lower);
+        // Get the compressed image URL using relative path
+        const compressedImageUrl = await getCompressedImageUrl(mostRecentImage.name);
 
         return {
-            thumbnail: thumbnailUrl,
+            compressed: compressedImageUrl,
             imagePath: mostRecentImage.path_lower
         };
     } catch (error) {
@@ -210,7 +169,7 @@ async function listExactYearFolders() {
                 for (const item of folderContents.entries) {
                     if (item['.tag'] === 'folder') {
                         const imageData = await getMostRecentImageFromFolder(item.path_lower);
-                        if (imageData && imageData.thumbnail) {
+                        if (imageData && imageData.compressed) {
                             // Create an 'a' element
                             const folderLink = document.createElement('a');
                             folderLink.className = 'folder-item';
@@ -225,14 +184,14 @@ async function listExactYearFolders() {
                             img.alt = item.name;
                             img.loading = 'lazy'; // Implement lazy loading
 
-                            // Set the styles to enforce 64x64 resolution
+                            // Set the styles for responsive image display
                             img.style.width = '100%';
                             img.style.height = 'auto';
                             img.style.objectFit = 'cover';
                             img.style.borderRadius = '4px';
 
-                            // Set the src attribute
-                            img.src = imageData.thumbnail;
+                            // Set the src attribute to the compressed image URL (relative path)
+                            img.src = imageData.compressed;
 
                             // Append the image to the folder link
                             folderLink.appendChild(img);
@@ -267,11 +226,6 @@ async function listExactYearFolders() {
                 iso.layout();
             });
 
-            // Ensure layout updates once all images are loaded
-            imagesLoaded(eventBentoGrid, function () {
-                iso.layout();
-            });
-
         } else {
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No folders named exactly '${year}' were found.`;
@@ -292,6 +246,5 @@ async function listExactYearFolders() {
         }
     }
 }
-
 
 listExactYearFolders();
