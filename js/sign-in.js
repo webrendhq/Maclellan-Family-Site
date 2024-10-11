@@ -27,7 +27,7 @@ async function handleSignUp(e) {
 
     try {
         const userCount = await getUserCount();
-        if (userCount >= 6) {
+        if (userCount >= 7) {
             const errorText = document.getElementById('signup-error-message');
             errorText.innerHTML = "User limit reached. No more sign-ups allowed.";
             return;
