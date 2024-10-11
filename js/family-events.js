@@ -1,24 +1,31 @@
+// main.js
+
 // Import necessary functions and tokens
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
+/**
+ * External Libraries:
+ * Ensure that Isotope and imagesLoaded are loaded via script tags in your HTML.
+ * They are available as global variables `Isotope` and `imagesLoaded`.
+ */
+
 // Initialize authentication state listener
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
         window.location.href = '/sign-in.html';
-    }
-    // If a user is signed in, do nothing and allow access to the current page.
-    else {
-        listExactYearFolders(); // Start listing folders
+    } else {
+        // If a user is signed in, start listing folders
+        await listExactYearFolders();
     }
 });
 
 // Function to get URL parameters
 function getUrlParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
-    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    var results = regex.exec(location.search);
+    const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    const results = regex.exec(location.search);
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
@@ -28,6 +35,9 @@ const year = getUrlParameter('year');
 function injectStyles() {
     const style = document.createElement('style');
     style.textContent = `
+        /* [Your existing CSS styles here] */
+        /* ... (omitted for brevity) ... */
+        
         /* Container for each folder item */
         .folder-item {
             position: relative;
@@ -35,7 +45,6 @@ function injectStyles() {
             transition: box-shadow 0.3s ease, transform 0.3s ease;
             overflow: hidden; /* Ensure child elements don't overflow */
             cursor: pointer; /* Indicate clickable item */
-            /* Remove fixed width and use flex-basis for responsiveness */
             flex: 1 1 auto;
             min-width: 200px; /* Minimum width to maintain layout */
             height: auto; /* Adjust height as needed */
@@ -60,12 +69,10 @@ function injectStyles() {
             width: 100%;
             height: 100%;
             object-fit: cover;
-           
             transition: filter 0.3s ease;
             border-radius: 8px;
             position: relative; /* Added to establish stacking context */
             z-index: 1; /* Ensure image is below the noise overlay */
-            
         }
 
         /* Remove blur on hover for better visibility */
@@ -88,11 +95,9 @@ function injectStyles() {
             font-weight: 800; /* Extra bold */
             font-size: 1.2em; /* Adjust as needed */
             text-align: center;
-            
             opacity: 0;
             transition: opacity 0.3s ease;
             pointer-events: none; /* Ensure caption doesn't block hover */
-            
             background: rgba(0, 0, 0, 0.3); /* Semi-transparent background for better text visibility */
             z-index: 2; /* Ensure caption is above the noise overlay */
         }
@@ -110,7 +115,7 @@ function injectStyles() {
             left: 0;
             width: 100%;
             height: 100%;
-            background-image: url('../images/noise.png');
+            background-image: url('./images/noise.png'); /* Relative path to noise.png */
             background-repeat: repeat;
             opacity: 1; /* Adjust opacity as needed */
             pointer-events: none; /* Allow clicks to pass through */
@@ -122,7 +127,6 @@ function injectStyles() {
         #event-bento-grid {
             display: flex;
             flex-wrap: wrap;
-            /* Removed gap: 16px; to let Isotope handle spacing */
             justify-content: center; /* Center items horizontally */
             padding: 20px; /* Add some padding around the grid */
         }
@@ -147,13 +151,17 @@ function injectStyles() {
             background-color: #007BFF;
             color: white;
             cursor: pointer;
+            border: 2px solid #000000;
             border-radius: 4px;
             font-size: 16px;
             transition: background-color 0.3s ease;
-            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.2);
+            box-shadow: -3px 3px 0px 0px #000000;
+            transition: all 0.3s ease;
         }
 
         .pagination-button:hover {
+            transform: translate(-3px, 3px);
+            box-shadow: -0px 0px 0px 0px #000000;
             background-color: #0056b3;
         }
 
@@ -336,7 +344,88 @@ function clearFoldersFromDB() {
     });
 }
 
-// Modified getThumbnailBlob to always use 'w128h128' and implement caching
+/**
+ * Thumbnail Fetching with Concurrency Control and Retry Mechanism
+ */
+
+// Configuration for thumbnail fetching
+const THUMBNAIL_CONCURRENCY_LIMIT = 12; // Further increased from 10 to 15
+const RETRY_LIMIT = 5; // Maximum number of retries for failed requests
+const INITIAL_BACKOFF = 1000; // Initial backoff time in ms
+
+// Simple semaphore to limit concurrency
+class Semaphore {
+    constructor(max) {
+        this.max = max;
+        this.current = 0;
+        this.queue = [];
+    }
+
+    acquire() {
+        return new Promise(resolve => {
+            if (this.current < this.max) {
+                this.current++;
+                resolve();
+            } else {
+                this.queue.push(resolve);
+            }
+        });
+    }
+
+    release() {
+        this.current--;
+        if (this.queue.length > 0) {
+            this.current++;
+            const resolve = this.queue.shift();
+            resolve();
+        }
+    }
+}
+
+const thumbnailSemaphore = new Semaphore(THUMBNAIL_CONCURRENCY_LIMIT);
+
+// Separate semaphore for general API calls to manage overall concurrency
+const API_CONCURRENCY_LIMIT = 12; // Further increased from 10 to 15
+const apiSemaphore = new Semaphore(API_CONCURRENCY_LIMIT);
+
+/**
+ * Helper function to perform fetch with retry on 429 errors
+ * @param {string} url - The API endpoint
+ * @param {object} options - Fetch options
+ * @param {number} retries - Number of retries left
+ */
+async function fetchWithRetry(url, options, retries = RETRY_LIMIT) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.status !== 429) {
+                return response;
+            }
+            if (attempt < retries) {
+                const data = await response.json();
+                const retryAfter = data.error && data.error.retry_after ? data.error.retry_after : 5;
+                console.warn(`Rate limited. Retrying after ${retryAfter} seconds... (Attempt ${attempt + 1} of ${RETRY_LIMIT})`);
+                await new Promise(resolve => setTimeout(resolve, (retryAfter + 1) * 1000)); // Adding 1 second buffer
+            } else {
+                throw new Error(`Max retries reached for ${url}`);
+            }
+        } catch (error) {
+            if (attempt < retries) {
+                const backoffTime = INITIAL_BACKOFF * Math.pow(2, attempt); // Exponential backoff
+                console.warn(`Fetch error: ${error.message}. Retrying after ${backoffTime} ms... (Attempt ${attempt + 1} of ${RETRY_LIMIT})`);
+                await new Promise(resolve => setTimeout(resolve, backoffTime));
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
+/**
+ * Function to fetch thumbnail blob with retries and backoff
+ * @param {string} path - Dropbox path of the file
+ * @param {number} retryCount - Current retry attempt
+ */
 async function getThumbnailBlob(path, retryCount = 0) {
     const size = 'w128h128'; // Enforce 128x128 resolution
     const cacheKey = `${path}_${size}`;
@@ -348,11 +437,12 @@ async function getThumbnailBlob(path, retryCount = 0) {
         return await cachedResponse.blob();
     }
 
-    // If not in cache, fetch the image
+    // Acquire semaphore before making the request
+    await thumbnailSemaphore.acquire();
+
     try {
-        const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
+        const response = await fetchWithRetry('https://content.dropboxapi.com/2/files/get_thumbnail', {
             method: 'POST',
-            mode: 'no-cors',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Dropbox-API-Arg': JSON.stringify({
@@ -360,36 +450,28 @@ async function getThumbnailBlob(path, retryCount = 0) {
                     format: 'jpeg',
                     size: size // Always use 'w128h128'
                 }),
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/octet-stream' // Corrected Content-Type
             }
         });
 
-        if (response.status === 429) {
-            if (retryCount < 5) {
-                const backoffTime = Math.pow(2, retryCount) * 1000; // Exponential backoff
-                console.log(`Rate limit reached. Retrying after ${backoffTime / 1000} seconds...`);
-                await new Promise(resolve => setTimeout(resolve, backoffTime));
-                return getThumbnailBlob(path, retryCount + 1); // Retry request
-            } else {
-                throw new Error(`Max retry attempts reached for path ${path}`);
-            }
-        }
-
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text(); // Get error details
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
         }
 
         // Clone the response so we can store it in the cache
         const responseClone = response.clone();
-        cache.put(cacheKey, responseClone);
+        await cache.put(cacheKey, responseClone);
 
         return await response.blob();
     } catch (error) {
-        console.error('Error fetching thumbnail:', error);
+        console.error(`Error fetching thumbnail for path ${path}:`, error);
         return null;
+    } finally {
+        // Release the semaphore regardless of success or failure
+        thumbnailSemaphore.release();
     }
 }
-
 
 // Function to create object URL for the thumbnail
 async function getThumbnail(path) {
@@ -398,8 +480,8 @@ async function getThumbnail(path) {
         const url = URL.createObjectURL(blob);
         return url;
     } else {
-        console.error(`Failed to fetch thumbnail for path ${path}`);
-        return null;
+        // Return a placeholder image or null
+        return './images/placeholder.png'; // Ensure you have a placeholder.png in your images folder
     }
 }
 
@@ -409,12 +491,17 @@ function extractFolderName(path) {
     return parts[parts.length - 1] || 'Unnamed Folder';
 }
 
-// Function to get the most recent image from a folder and its thumbnail
+/**
+ * Function to get the most recent image from a folder and its thumbnail
+ * @param {string} folderPath - Dropbox path of the folder
+ */
 async function getMostRecentImageFromFolder(folderPath) {
     try {
-        const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+        // Acquire API semaphore
+        await apiSemaphore.acquire();
+
+        const response = await fetchWithRetry('https://api.dropboxapi.com/2/files/list_folder', {
             method: 'POST',
-            mode: 'no-cors',
             headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
@@ -431,13 +518,46 @@ async function getMostRecentImageFromFolder(folderPath) {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
         }
 
         const data = await response.json();
 
+        // Handle has_more for list_folder
+        let allEntries = data.entries;
+        let hasMore = data.has_more;
+        let cursor = data.cursor;
+
+        while (hasMore) {
+            const continueResponse = await fetchWithRetry('https://api.dropboxapi.com/2/files/list_folder/continue', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cursor: cursor })
+            });
+
+            if (!continueResponse.ok) {
+                const errorText = await continueResponse.text();
+                throw new Error(`HTTP error on list_folder/continue! status: ${continueResponse.status}, message: ${errorText}`);
+            }
+
+            const continueData = await continueResponse.json();
+            allEntries = allEntries.concat(continueData.entries);
+            hasMore = continueData.has_more;
+            cursor = continueData.cursor;
+        }
+
+        // Release API semaphore
+        apiSemaphore.release();
+
+        // Log the contents of the folder to the console
+        console.log(`Contents of folder "${extractFolderName(folderPath)}":`, allEntries);
+
         // Filter files that are images based on media_info or file extensions
-        const imageFiles = data.entries.filter(entry =>
+        const imageFiles = allEntries.filter(entry =>
             entry['.tag'] === 'file' &&
             (
                 (entry.media_info && entry.media_info['.tag'] === 'photo') ||
@@ -511,11 +631,15 @@ function hideSpinner() {
 // Create the spinner element
 createLoadingSpinner();
 
+/**
+ * Responsive and Debounce Utilities
+ */
+
 // Function to calculate and set the number of columns
 function setResponsiveColumns(eventBentoGrid, iso) {
     const gridWidth = eventBentoGrid.clientWidth;
     const minItemWidth = 200; // Minimum desired width for each item
-    const gutter = 0; // Gutter defined in Isotope (16px)
+    const gutter = 4; // Gutter defined in Isotope
 
     // Calculate the number of columns that can fit
     const columns = Math.floor((gridWidth + gutter) / (minItemWidth + gutter)) || 1;
@@ -544,7 +668,9 @@ function debounce(func, wait) {
     };
 }
 
-// Main function to list folders and display images with pagination
+/**
+ * Main Function to List Folders and Display Images with Pagination
+ */
 async function listExactYearFolders() {
     if (!year) {
         console.error('No year specified in URL parameters. Use ?year=YYYY in the URL.');
@@ -562,43 +688,11 @@ async function listExactYearFolders() {
 
         if (exactMatches.length === 0) {
             // If no cached data, fetch from Dropbox API
-            await refreshDropboxAccessToken();
+            await refreshDropboxAccessToken(); // Ensure accessToken is fresh
             console.log(`Searching for folders named exactly '${year}'...`);
 
-            const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    query: year,
-                    options: {
-                        path: "",
-                        max_results: 1000,
-                        file_status: "active",
-                        filename_only: true
-                    },
-                    match_field_options: {
-                        include_highlights: false
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            exactMatches = data.matches.filter(match =>
-                match.metadata.metadata['.tag'] === 'folder' &&
-                match.metadata.metadata.name === year
-            ).map(match => ({
-                path_lower: match.metadata.metadata.path_lower,
-                name: match.metadata.metadata.name
-            }));
+            // Fetch folders named exactly as the year using list_folder
+            exactMatches = await fetchExactYearFolders(year);
 
             if (exactMatches.length > 0) {
                 // Save fetched folders to IndexedDB
@@ -619,122 +713,170 @@ async function listExactYearFolders() {
             // Collect all folder paths
             const folderPaths = exactMatches.map(match => match.path_lower);
 
-            // Fetch contents for all folders in parallel
-            const folderContentsPromises = folderPaths.map(folderPath => fetch('https://api.dropboxapi.com/2/files/list_folder', {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    path: folderPath,
-                    recursive: false,
-                    include_media_info: false,
-                    include_deleted: false,
-                    include_has_explicit_shared_members: false,
-                    include_mounted_folders: false,
-                    limit: 2000
-                })
-            }));
+            /**
+             * Function to fetch all folder contents handling has_more
+             */
+            async function fetchAllFolderContents(folderPath) {
+                let allEntries = [];
+                let hasMore = true;
+                let cursor = null;
 
-            const folderContentsResponses = await Promise.all(folderContentsPromises);
+                while (hasMore) {
+                    let requestBody = {
+                        path: folderPath,
+                        recursive: false,
+                        include_media_info: false,
+                        include_deleted: false,
+                        include_has_explicit_shared_members: false,
+                        include_mounted_folders: false,
+                        limit: 2000
+                    };
 
-            // Check for any failed fetches
-            folderContentsResponses.forEach((response, index) => {
-                if (!response.ok) {
-                    console.error(`HTTP error fetching contents for folder ${folderPaths[index]}! status: ${response.status}`);
+                    if (cursor) {
+                        requestBody = {
+                            cursor: cursor
+                        };
+                    }
+
+                    const endpoint = cursor ? 'https://api.dropboxapi.com/2/files/list_folder/continue' : 'https://api.dropboxapi.com/2/files/list_folder';
+
+                    // Acquire API semaphore before making the request
+                    await apiSemaphore.acquire();
+
+                    try {
+                        const response = await fetchWithRetry(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestBody)
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`HTTP error on list_folder/continue for path ${folderPath}! status: ${response.status}, message: ${errorText}`);
+                        }
+
+                        const data = await response.json();
+
+                        allEntries = allEntries.concat(data.entries);
+                        hasMore = data.has_more;
+                        cursor = data.cursor;
+                    } catch (error) {
+                        console.error(`Error fetching contents for folder "${extractFolderName(folderPath)}" (${folderPath}):`, error);
+                        throw error; // Rethrow to be caught by outer try-catch
+                    } finally {
+                        // Release API semaphore
+                        apiSemaphore.release();
+                    }
                 }
-            });
 
-            // Parse all folder contents
-            const folderContentsData = await Promise.all(folderContentsResponses.map(res => res.ok ? res.json() : Promise.resolve(null)));
+                return allEntries;
+            }
+
+            // Fetch all folder contents with handling for has_more
+            const folderContentsPromises = folderPaths.map(folderPath => 
+                fetchAllFolderContents(folderPath).then(entries => ({
+                    path_lower: folderPath,
+                    entries: entries
+                })).catch(error => {
+                    console.error(`Error fetching contents for folder "${extractFolderName(folderPath)}" (${folderPath}):`, error);
+                    return null; // Return null for failed fetches
+                })
+            );
+
+            const folderContentsResults = await Promise.all(folderContentsPromises);
 
             // Collect all folder items (subfolders within each year folder)
-            const folderItems = folderContentsData.flatMap((folderData, idx) => {
-                if (!folderData) return []; // Skip if fetch failed
-                return folderData.entries.filter(item => item['.tag'] === 'folder').map(item => ({
+            const folderItems = folderContentsResults.flatMap(result => {
+                if (!result) return []; // Skip if fetch failed
+                return result.entries.filter(item => item['.tag'] === 'folder').map(item => ({
                     path_lower: item.path_lower,
                     name: item.name
                 }));
             });
 
-            // Fetch the most recent image for all folders in parallel
-            const imageDataPromises = folderItems.map(item => 
-                getMostRecentImageFromFolder(item.path_lower).then(imageData => ({
-                    ...imageData,
-                    folderName: item.name,
-                    folderPath: item.path_lower // Add folderPath to the data
-                }))
-            );
-            const allImageData = await Promise.all(imageDataPromises);
+            // Log all folder items to the console
+            console.log(`Subfolders within '${year}':`, folderItems);
 
-            // Filter out folders without images
-            const validImageData = allImageData.filter(data => data && data.thumbnail);
-
-            if (validImageData.length === 0) {
-                const noImagesDiv = document.createElement('div');
-                noImagesDiv.textContent = `No images found in the subfolders of '${year}'.`;
-                eventBentoGrid.appendChild(noImagesDiv);
-                hideSpinner(); // Hide spinner as loading is complete
-                return;
-            }
+            // To optimize speed, fetch image data in parallel with higher concurrency
+            // and render folder items as they become available.
 
             // Pagination Variables
             const itemsPerPage = 49;
-            const totalPages = Math.ceil(validImageData.length / itemsPerPage);
+            const totalPages = Math.ceil(folderItems.length / itemsPerPage);
             let currentPage = 1;
 
             // Function to render a specific page
-            function renderPage(pageNumber) {
+            async function renderPage(pageNumber) {
                 // Calculate start and end indices
                 const startIndex = (pageNumber - 1) * itemsPerPage;
                 const endIndex = startIndex + itemsPerPage;
-                const itemsToDisplay = validImageData.slice(startIndex, endIndex);
-            
+                const itemsToDisplay = folderItems.slice(startIndex, endIndex);
+
                 // Clear existing items in the grid
                 eventBentoGrid.innerHTML = '';
-            
-                // Append new items
-                itemsToDisplay.forEach(data => {
-                    // Create an 'a' element
-                    const folderLink = document.createElement('a');
-                    folderLink.className = 'folder-item';
-            
-                    // Set the href attribute to include year and folderPath (exclude imagePath)
-                    const encodedFolderPath = encodeURIComponent(data.folderPath);
-                    const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedFolderPath}`;
-                    folderLink.href = href;
-            
-                    // Create an img element
-                    const img = document.createElement('img');
-                    img.alt = data.folderName;
-                    img.loading = 'lazy'; // Implement lazy loading
-            
-                    // Set the src attribute
-                    img.src = data.thumbnail;
-            
-                    // Append the image to the folder link
-                    folderLink.appendChild(img);
-            
-                    // **Add Noise Overlay**
-                    const noiseOverlay = document.createElement('div');
-                    noiseOverlay.className = 'noise-overlay';
-                    folderLink.appendChild(noiseOverlay);
-                    // **End of Noise Overlay**
-            
-                    // Create a caption element with the folder's name
-                    const caption = document.createElement('div');
-                    caption.className = 'caption';
-                    caption.textContent = data.folderName; // Use folder name for caption
-            
-                    // Append the caption to the folder link
-                    folderLink.appendChild(caption);
-            
-                    // Append the folder link to the grid
-                    eventBentoGrid.appendChild(folderLink);
-                });
-            
+
+                // Function to process and append a single folder item
+                async function processFolderItem(folder) {
+                    const imageData = await getMostRecentImageFromFolder(folder.path_lower);
+                    if (imageData && imageData.thumbnail) {
+                        // Create an 'a' element
+                        const folderLink = document.createElement('a');
+                        folderLink.className = 'folder-item';
+
+                        // Set the href attribute to include year and folderPath (exclude imagePath)
+                        const encodedFolderPath = encodeURIComponent(folder.path_lower);
+                        const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedFolderPath}`;
+                        folderLink.href = href;
+
+                        // Create an img element
+                        const img = document.createElement('img');
+                        img.alt = folder.name;
+                        img.loading = 'lazy'; // Implement lazy loading
+
+                        // Set the src attribute
+                        img.src = imageData.thumbnail;
+
+                        // Append the image to the folder link
+                        folderLink.appendChild(img);
+
+                        // **Add Noise Overlay**
+                        const noiseOverlay = document.createElement('div');
+                        noiseOverlay.className = 'noise-overlay';
+                        folderLink.appendChild(noiseOverlay);
+                        // **End of Noise Overlay**
+
+                        // Create a caption element with the folder's name
+                        const caption = document.createElement('div');
+                        caption.className = 'caption';
+                        caption.textContent = folder.name; // Use folder name for caption
+
+                        // Append the caption to the folder link
+                        folderLink.appendChild(caption);
+
+                        // Append the folder link to the grid
+                        eventBentoGrid.appendChild(folderLink);
+                    }
+                }
+
+                // Fetch and render all items in parallel, respecting the concurrency limit
+                const MAX_RENDER_CONCURRENCY = API_CONCURRENCY_LIMIT; // Using the same as API semaphore
+                const renderSemaphore = new Semaphore(MAX_RENDER_CONCURRENCY);
+
+                const renderPromises = itemsToDisplay.map(folder => (async () => {
+                    await renderSemaphore.acquire();
+                    try {
+                        await processFolderItem(folder);
+                    } finally {
+                        renderSemaphore.release();
+                    }
+                })());
+
+                // Wait for all render operations in the page to complete
+                await Promise.all(renderPromises);
+
                 // Use imagesLoaded to ensure all images are loaded before initializing Isotope
                 imagesLoaded(eventBentoGrid, function () {
                     // Initialize or Update Isotope
@@ -746,24 +888,24 @@ async function listExactYearFolders() {
                             masonry: {
                                 columnWidth: '.folder-item',
                                 horizontalOrder: true,
-                                gutter: 4 // Set gutter to 16px
+                                gutter: 4 // Set gutter to 4px
                             }
                         });
                     } else {
                         window.iso.reloadItems();
                         window.iso.layout();
                     }
-            
+
                     // Set responsive columns
                     setResponsiveColumns(eventBentoGrid, window.iso);
                 });
-            
+
                 // Scroll to top of grid on page change
                 window.scrollTo({
                     top: eventBentoGrid.offsetTop - 20,
                     behavior: 'smooth'
                 });
-            
+
                 // Update pagination controls
                 updatePaginationControls();
             }
@@ -807,6 +949,7 @@ async function listExactYearFolders() {
                         pageButton.classList.add('active');
                     }
                     pageButton.onclick = () => {
+                        currentPage = i;
                         renderPage(i);
                     };
                     paginationDiv.appendChild(pageButton);
@@ -845,7 +988,7 @@ async function listExactYearFolders() {
             }
 
             // Initial render
-            renderPage(currentPage);
+            await renderPage(currentPage);
 
             // Add event listener for window resize to adjust columns
             window.addEventListener('resize', debounce(() => {
@@ -866,7 +1009,6 @@ async function listExactYearFolders() {
         }
 
         console.log(`Finished listing folders for ${year}.`);
-
     } catch (error) {
         console.error('Error searching Dropbox folders:', error);
         console.error('Error details:', error ? error.message : 'Unknown error');
@@ -883,5 +1025,103 @@ async function listExactYearFolders() {
     }
 }
 
-// Call the main function to list folders
-listExactYearFolders();
+/**
+ * Fetch Folders Named Exactly as the Year Using list_folder
+ * This function replaces the search_v2 logic.
+ */
+async function fetchExactYearFolders(year) {
+    await refreshDropboxAccessToken(); // Ensure accessToken is fresh
+    console.log(`Fetching folders named exactly '${year}' using list_folder...`);
+
+    const folderMatches = [];
+
+    // Acquire API semaphore
+    await apiSemaphore.acquire();
+
+    try {
+        // Initial list_folder request
+        const response = await fetchWithRetry('https://api.dropboxapi.com/2/files/list_folder', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                path: "", // Root directory
+                recursive: true, // Search recursively
+                include_media_info: false,
+                include_deleted: false,
+                include_has_explicit_shared_members: false,
+                include_mounted_folders: false,
+                limit: 2000
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        // Process entries
+        data.entries.forEach(entry => {
+            if (entry['.tag'] === 'folder' && entry.name === year) {
+                folderMatches.push({
+                    path_lower: entry.path_lower,
+                    name: entry.name
+                });
+            }
+        });
+
+        let hasMore = data.has_more;
+        let cursor = data.cursor;
+
+        // Continue fetching if there are more entries
+        while (hasMore) {
+            const continueResponse = await fetchWithRetry('https://api.dropboxapi.com/2/files/list_folder/continue', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cursor: cursor })
+            });
+
+            if (!continueResponse.ok) {
+                const errorText = await continueResponse.text();
+                throw new Error(`HTTP error on list_folder/continue! status: ${continueResponse.status}, message: ${errorText}`);
+            }
+
+            const continueData = await continueResponse.json();
+
+            // Process entries
+            continueData.entries.forEach(entry => {
+                if (entry['.tag'] === 'folder' && entry.name === year) {
+                    folderMatches.push({
+                        path_lower: entry.path_lower,
+                        name: entry.name
+                    });
+                }
+            });
+
+            hasMore = continueData.has_more;
+            cursor = continueData.cursor;
+        }
+
+        // Save fetched folders to IndexedDB
+        if (folderMatches.length > 0) {
+            await saveFoldersToDB(folderMatches);
+            console.log(`Fetched and cached ${folderMatches.length} folders named '${year}'.`);
+        }
+
+        return folderMatches;
+
+    } catch (error) {
+        console.error('Error fetching folders using list_folder:', error);
+        throw error; // Rethrow to be caught by outer try-catch
+    } finally {
+        // Release API semaphore
+        apiSemaphore.release();
+    }
+}

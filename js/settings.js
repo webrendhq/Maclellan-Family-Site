@@ -10,6 +10,7 @@ import {
 import { doc, setDoc, getDoc, getDocs, updateDoc, collection } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 import { dbx } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 
+//
 
 onAuthStateChanged(auth, (user) => {
     if (!user) {
@@ -252,11 +253,14 @@ onAuthStateChanged(auth, async (user) => {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         const userData = userDoc.data();
         
+        // Check if user is admin
         if (userData && userData.role === "admin") {
             document.getElementById("adminPanel").style.display = "block";
+            document.getElementById("uploadBtn").style.display = "block";  // Show the upload button
             displayUsers(); // Call this function to show the user list for admins
         } else {
             document.getElementById("adminPanel").style.display = "none";
+            document.getElementById("uploadBtn").style.display = "none";  // Hide the upload button
             document.getElementById("userList").style.display = "none";
         }
         
@@ -264,9 +268,11 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         document.getElementById("adminPanel").style.display = "none";
         document.getElementById("userList").style.display = "none";
+        document.getElementById("uploadBtn").style.display = "none";  // Hide the upload button if no user is logged in
         document.getElementById("currentRole").textContent = "Not signed in";
     }
 });
+
 
 async function changeUserRole(newRole) {
     if (!currentUser) {
@@ -303,7 +309,7 @@ async function displayUsers() {
                 <p><strong>Name:</strong> ${userData.name || 'N/A'}</p>
                 <p><strong>Email:</strong> ${userData.email || 'N/A'}</p>
                 <p><strong>Role:</strong> ${userData.role || 'N/A'}</p>
-                <button onclick="openDeleteModal('${doc.id}', '${userData.email}')">Remove User</button>
+                
                 <hr>
             `;
             userListDiv.appendChild(userElement);
@@ -313,6 +319,8 @@ async function displayUsers() {
         userListDiv.innerHTML += "<p>Error fetching users. Please try again later.</p>";
     }
 }
+
+{/* <button onclick="openDeleteModal('${doc.id}', '${userData.email}')">Remove User</button> */}
 
 window.openDeleteModal = (userId, userEmail) => {
     const modal = document.getElementById("deleteModal");

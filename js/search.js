@@ -2,19 +2,30 @@
 import { refreshDropboxAccessToken, accessToken } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/dropbox-auth.js';
 import { auth, onAuthStateChanged } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
 
-onAuthStateChanged(auth, (user) => {
+/**
+ * External Libraries:
+ * Ensure that Isotope and imagesLoaded are loaded via script tags in your HTML.
+ * They are available as global variables `Isotope` and `imagesLoaded`.
+ */
+
+// Initialize authentication state listener
+onAuthStateChanged(auth, async (user) => {
     if (!user) {
         // No user is signed in, redirect to the sign-in page.
         window.location.href = '/sign-in.html';
+    } else {
+        // Start the search
+        await initializeSearchFromURL();
     }
-    // If a user is signed in, do nothing and allow access to the current page.
 });
-
 
 let cursor = null;
 let startIndex = 0;
 let currentQuery = "";
 let hasMore = false;
+let currentPage = 1;
+const itemsPerPage = 12;
+let totalPages = 1;
 
 // Function to update the URL with the search query
 function updateURLWithQuery(query) {
@@ -29,9 +40,143 @@ function getQueryFromURL() {
     return urlParams.get('query') || "";
 }
 
+// Function to check for additional URL parameters and adjust the number of appended elements
+function getAdditionalParam() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return parseInt(urlParams.get('adjust')) || 0; // Default adjustment is 0 if not present
+}
 
+// Inject necessary CSS styles for the noise overlay and pagination
+function injectStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .folder-item {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            flex: 1 1 auto;
+            min-width: 200px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            z-index: 0;
+        }
 
-// Function to search Dropbox files and append results
+        .folder-item:hover {
+            transform: scale(1.10);
+            z-index: 99;
+            box-shadow: inset 0px 0px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .folder-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: filter 0.3s ease;
+            border-radius: 8px;
+            z-index: 1;
+        }
+
+        .folder-item:hover img {
+            filter: blur(0);
+            z-index: 99;
+        }
+
+        .folder-item .caption {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 1.2em;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 2;
+        }
+
+        .folder-item:hover .caption {
+            opacity: 1;
+            z-index: 99;
+        }
+
+        .noise-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('./images/noise.png');
+            background-repeat: repeat;
+            pointer-events: none;
+            z-index: 9999;
+            box-shadow: inset 0px 0px 50px rgba(0, 0, 0, 1);
+        }
+
+        #pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            margin-bottom: 5vh;
+            gap: 10px;
+        }
+
+        .pagination-button {
+            padding: 8px 12px;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .pagination-button:hover {
+            background-color: #0056b3;
+        }
+
+        .pagination-button.disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .pagination-button.active {
+            background-color: #0056b3;
+            font-weight: bold;
+        }
+    `;
+    document.head.appendChild(style);
+}
+injectStyles();
+
+// Create observer for lazy loading images
+function createObserver() {
+    return new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const mediaElement = entry.target;
+                if (!mediaElement.src) {
+                    mediaElement.src = mediaElement.dataset.src;
+                    mediaElement.style.opacity = '1';
+                }
+                observer.unobserve(mediaElement);
+            }
+        });
+    }, { rootMargin: '100px' });
+}
+
+const imageObserver = createObserver();
+
+// Fetch Dropbox files and append results
 async function searchDropboxFiles(query, startIndex = 0) {
     console.log("Searching Dropbox files with query:", query);
     await refreshDropboxAccessToken(); // Ensure the access token is fresh
@@ -48,14 +193,14 @@ async function searchDropboxFiles(query, startIndex = 0) {
                 },
                 body: JSON.stringify({
                     query: query,
-                    options: { max_results: 100 } // Request more results to check if there are more
+                    options: { max_results: 100 }
                 })
             });
 
             if (response.ok) {
                 const data = await response.json();
                 searchResults = data.matches.map(match => match.metadata.metadata);
-                cursor = data.has_more ? data.cursor : null; // Save the cursor only if there are more results
+                cursor = data.has_more ? data.cursor : null;
                 hasMore = data.has_more;
             } else {
                 console.error('Error searching Dropbox files:', response.statusText);
@@ -76,76 +221,36 @@ async function searchDropboxFiles(query, startIndex = 0) {
             if (response.ok) {
                 const data = await response.json();
                 searchResults = data.matches.map(match => match.metadata.metadata);
-                cursor = data.has_more ? data.cursor : null; // Update cursor only if there are more results
+                cursor = data.has_more ? data.cursor : null;
                 hasMore = data.has_more;
             } else {
                 console.error('Error continuing search for Dropbox files:', response.statusText);
             }
         }
     } catch (error) {
-        console.error('Error during search or continue search:', error);
+        console.error('Error during search:', error);
     }
 
     console.log("Search results:", searchResults);
     return searchResults;
 }
 
-function createObserver() {
-    return new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const mediaElement = entry.target;
-                if (!mediaElement.src) {
-                    mediaElement.src = mediaElement.dataset.src;
-                    mediaElement.style.opacity = '1';
-                }
-                observer.unobserve(mediaElement);
-            }
-        });
-    }, { rootMargin: '100px' });
-}
-
-const imageObserver = createObserver();
-
-const itemClasses = [
-    "bento-grid-family-photo w-node-_94965c23-ae8a-8ce0-e964-880b257bc7b7-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-ec6869a4-d13b-cd8c-e6dd-19dda5ef75a4-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-dccce7c7-c208-2da0-de4a-34a8011fdf92-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_9225746e-1b4e-b654-ae25-f860cb774aa7-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_4f41c8bf-ce48-cfea-1c26-9fa79bee9afc-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_3945aeda-f377-0051-274a-20cc734dc9f8-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_5f1a6629-3047-f65e-2a71-339c12d0b905-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_6793b981-9fe9-6b6a-f2aa-585dbcaf6bc-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_5e5a805e-3778-fd3c-f49f-faf8b86c33bb-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-_4c6d9103-222a-7e47-8b80-c0c1af28f0f-b5c26c10 w-inline-block",
-    "bento-grid-family-photo w-node-e18d4e44-b537-61bd-0245-f90047d328d8-b5c26c10 w-inline-block"
-];
-
-let currentItemIndex = 0;
-
-// Function to append search results to the DOM
-async function appendResults(results) {
+// Pagination and render logic
+async function renderPage(results) {
     const container = document.getElementById('search-grid');
-    if (startIndex === 0) {
-        container.innerHTML = ''; // Clear previous results only on new search
-        currentItemIndex = 0; // Reset the item index on new search
-    }
+    container.innerHTML = '';  // Clear previous results
 
-    let appendedCount = 0;
+    // Get the adjustment value from URL param (subtract 1 if applicable)
+    const adjustment = getAdditionalParam();
+    let adjustedItemsPerPage = itemsPerPage + adjustment;  // Adjust the number of items to append
 
-    for (const file of results) {
-        if (appendedCount >= 11 || currentItemIndex >= 11) { // Stop appending after 11 elements
-            break;
-        }
+    results.slice(0, adjustedItemsPerPage).forEach(async (file, index) => {
         if (file['.tag'] === 'file') {
             const fileExtension = file.name.split('.').pop().toLowerCase();
-            
-            let format = 'jpeg'; // Default format
-            if (['png', 'heic'].includes(fileExtension)) {
-                format = fileExtension; // Use png or heic if applicable
-            }
-        
-            if (['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'avi', 'mkv'].includes(fileExtension)) {
+            let format = 'jpeg';  // Default format
+
+            // Check for specific image or video file extensions
+            if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
                 try {
                     const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
                         method: 'POST',
@@ -167,174 +272,138 @@ async function appendResults(results) {
                             })
                         }
                     });
-            
+
                     if (!thumbnailResponse.ok) {
                         console.error('Error getting thumbnail:', thumbnailResponse.statusText);
-                        continue;
+                        return;
                     }
 
                     if (tempLinkResponse.ok) {
                         const tempLinkData = await tempLinkResponse.json();
                         const previewData = await thumbnailResponse.blob();
-                        
                         let previewUrl = URL.createObjectURL(previewData);
-                        console.log('Thumbnail size:', previewData.size);
-                        let mediaElement;
-                        
-                        if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
-                            mediaElement = document.createElement('img');
-                        } else if (['mp4', 'mov', 'avi', 'mkv'].includes(fileExtension)) {
-                            mediaElement = document.createElement('video');
-                            mediaElement.controls = true;
-                            
-                        }
 
-                        if (mediaElement) {
-                            mediaElement.className = 'fade-in';
-                            mediaElement.style.opacity = '0';  // Start fully transparent
-                            mediaElement.style.transition = 'opacity 0.5s ease-in-out';
-                            mediaElement.src = previewUrl;
+                        const folderLink = document.createElement('a');
+                        folderLink.className = 'folder-item';
 
-                            mediaElement.style.width = '100%';
-                            mediaElement.style.height = '100%';
-                            mediaElement.style.objectFit = 'cover';
-                            mediaElement.style.maxHeight = '200px';
-                            mediaElement.loading = 'lazy';
-                            mediaElement.style.imageRendering = 'crisp-edges';
+                        const img = document.createElement('img');
+                        img.src = previewUrl;
+                        img.style.width = '100%';
+                        img.style.height = '100%';
+                        img.style.objectFit = 'cover';
 
-                            const wrapper = document.createElement('div');
-                            wrapper.className = itemClasses[currentItemIndex]; // Assign the appropriate class
-                            wrapper.style.position = 'relative';
-                            wrapper.style.display = 'inline-block';
-                            wrapper.appendChild(mediaElement);
-                            container.appendChild(wrapper);
+                        folderLink.appendChild(img);
 
-                            // Trigger reflow to ensure the initial state is applied before starting the animation
-                            mediaElement.offsetHeight;
+                        // Add noise overlay
+                        const noiseOverlay = document.createElement('div');
+                        noiseOverlay.className = 'noise-overlay';
+                        folderLink.appendChild(noiseOverlay);
 
-                            // Start the fade-in
-                            mediaElement.style.opacity = '1';
+                        // Caption
+                        const caption = document.createElement('div');
+                        caption.className = 'caption';
+                        caption.textContent = file.name;
+                        folderLink.appendChild(caption);
 
-                            appendedCount++;
-                            startIndex++;
-                            currentItemIndex++;
-                        }
-                    } else {
-                        console.error('Error getting temporary link:', tempLinkResponse.statusText);
+                        container.appendChild(folderLink);
+                        imageObserver.observe(img);
                     }
                 } catch (error) {
-                    console.error('Error fetching temporary link:', error);
+                    console.error('Error fetching thumbnail or temp link:', error);
                 }
             }
         }
-    }
+    });
 
-    // Show "Load More" button if there are more results and we've appended less than 11 items
-    if (hasMore && appendedCount === 11) {
-        appendLoadMoreButton();
-    } else {
-        hideLoadMoreButton();
+    // Initialize Isotope for masonry layout after images load
+    imagesLoaded(container, function () {
+        const iso = new Isotope(container, {
+            itemSelector: '.folder-item',
+            layoutMode: 'masonry',
+            percentPosition: true,
+            masonry: {
+                columnWidth: '.folder-item',
+                horizontalOrder: true,
+                gutter: 4
+            }
+        });
+    });
+
+    createPaginationControls();
+}
+
+function createPaginationControls() {
+    const container = document.getElementById('pagination-controls');
+    container.innerHTML = '';  // Clear old controls
+
+    for (let i = 1; i <= totalPages; i++) {
+        const button = document.createElement('button');
+        button.classList.add('pagination-button');
+        if (i === currentPage) {
+            button.classList.add('active');
+        }
+        button.textContent = i;
+        button.addEventListener('click', () => {
+            currentPage = i;
+            loadPage(i);
+        });
+        container.appendChild(button);
     }
 }
 
-async function handleSearch(query) {
-    console.log("handleSearch called with query:", query);
-    if (query) {
-        // Update URL with the current query
-        updateURLWithQuery(query);
-
-        startIndex = 0;
-        cursor = null; // Reset cursor for new search
-        currentQuery = query;
-        const results = await searchDropboxFiles(query);
-        await appendResults(results);
-    }
+// Load the specified page of results
+async function loadPage(page) {
+    const startIndex = (page - 1) * itemsPerPage;
+    const results = await searchDropboxFiles(currentQuery, startIndex);
+    renderPage(results);
 }
 
 // Separate function to initialize search from URL
 async function initializeSearchFromURL() {
     console.log("initializeSearchFromURL called");
     const queryFromURL = getQueryFromURL();
-    console.log("Query from URL:", queryFromURL);
     
     if (queryFromURL) {
         document.getElementById('search-input').value = queryFromURL; // Populate search input with the query from URL
         await handleSearch(queryFromURL);
-    } else {
-        console.log("No query found in URL");
     }
 }
 
-async function initialize() {
-    console.log("Initializing...");
-    try {
-        await refreshDropboxAccessToken();
-        console.log("Dropbox token refreshed");
-        await initializeSearchFromURL();
-    } catch (error) {
-        console.error("Error during initialization:", error);
+async function handleSearch(query) {
+    if (query) {
+        updateURLWithQuery(query);
+        currentPage = 1;  // Reset pagination
+        const results = await searchDropboxFiles(query);
+        renderPage(results);
     }
 }
 
-function appendLoadMoreButton() {
-    const loadMoreButton = document.getElementById('load-more-button');
-    loadMoreButton.style.display = 'flex';
-}
-
-function hideLoadMoreButton() {
-    const loadMoreButton = document.getElementById('load-more-button');
-    loadMoreButton.style.display = 'none';
-}
-
-async function loadMoreFiles() {
-    if (currentItemIndex >= 11) {
-        currentItemIndex = 0; // Reset to start assigning classes from the beginning
-    }
-    const results = await searchDropboxFiles(currentQuery, startIndex);
-    await appendResults(results);
-}
-
-// Add event listener to search button
+// Event listeners for search and pagination
 document.getElementById('search-button').addEventListener('click', () => {
-    const searchInput = document.getElementById('search-input');
-    handleSearch(searchInput.value.trim());
+    const query = document.getElementById('search-input').value.trim();
+    handleSearch(query);
 });
 
-// Add event listener for pressing Enter in the search input
 document.getElementById('search-input').addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
-        handleSearch(this.value.trim());
+        const query = this.value.trim();
+        handleSearch(query);
     }
 });
 
-// Initialize by setting up the "Load More" button
-const loadMoreWrapper = document.getElementById('load-more-wrapper');
-const loadMoreButton = document.createElement('button');
-loadMoreButton.id = 'load-more-button';
-loadMoreButton.innerText = 'Load More';
-loadMoreButton.style.display = 'none';
-loadMoreButton.addEventListener('click', loadMoreFiles);
-
-loadMoreWrapper.appendChild(loadMoreButton);
-
-
-// At the end of your script file, replace the DOMContentLoaded event listener with this:
-
-function domReady(fn) {
-    if (document.readyState === "complete" || document.readyState === "interactive") {
-        setTimeout(fn, 1);
-    } else {
-        document.addEventListener("DOMContentLoaded", fn);
-    }
+// Initialize on page load
+function initialize() {
+    console.log("Initializing...");
+    refreshDropboxAccessToken().then(() => {
+        console.log("Dropbox token refreshed");
+        initializeSearchFromURL();
+    }).catch(error => {
+        console.error("Error during initialization:", error);
+    });
 }
 
-domReady(function() {
+// Check if DOM is ready
+document.addEventListener("DOMContentLoaded", function() {
     console.log("DOM is ready");
     initialize();
 });
-
-// If you want to be extra sure, you can also add this:
-if (document.readyState === "complete") {
-    console.log("Document already complete, initializing...");
-    initialize();
-}

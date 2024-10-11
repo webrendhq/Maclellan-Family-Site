@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "dropbox": "^10.34.0",
     "simple-git": "^3.27.0"
   }
 }
