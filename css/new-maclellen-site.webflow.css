@@ -1605,10 +1605,10 @@ body {
 }
 
 .log-in__h {
-  margin-top: -15px;
-  font-size: 34px;
+  margin-top: 0px;
+  font-size: 24px;
   font-weight: 700;
-  line-height: 1.1em;
+  line-height: 1em;
 }
 
 .social-btn-2 {
