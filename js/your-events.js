@@ -104,18 +104,20 @@ function injectStyles() {
             color: white;
             font-weight: 800;
             font-size: 1.2em;
+            opacity: 0.8;
             text-align: center;
-            opacity: 0;
             transition: opacity 0.3s ease;
             pointer-events: none;
             background: rgba(0, 0, 0, 0.3);
             z-index: 2;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
         }
 
         /* Show caption on hover */
         .folder-item:hover .caption {
             opacity: 1;
             z-index: 99;
+            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
         }
 
         /* Noise Overlay Styling */
@@ -542,6 +544,204 @@ function debounce(func, wait) {
     };
 }
 
+async function fetchAllFolderContents(folderPath) {
+    let allEntries = [];
+    let hasMore = true;
+    let cursor = null;
+
+    while (hasMore) {
+        let requestBody = {
+            path: folderPath,
+            recursive: false,
+            include_media_info: false,
+            include_deleted: false,
+            include_has_explicit_shared_members: false,
+            include_mounted_folders: false,
+            limit: 2000
+        };
+
+        if (cursor) {
+            requestBody = { cursor: cursor };
+        }
+
+        const endpoint = cursor ? 'https://api.dropboxapi.com/2/files/list_folder/continue' : 'https://api.dropboxapi.com/2/files/list_folder';
+
+        await apiSemaphore.acquire();
+
+        try {
+            const response = await fetchWithRetry(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error on list_folder/continue for path ${folderPath}! status: ${response.status}, message: ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            allEntries = allEntries.concat(data.entries);
+            hasMore = data.has_more;
+            cursor = data.cursor;
+        } catch (error) {
+            console.error(`Error fetching contents for folder "${extractFolderName(folderPath)}" (${folderPath}):`, error);
+            throw error;
+        } finally {
+            apiSemaphore.release();
+        }
+    }
+
+    return allEntries;
+}
+
+
+async function openImageModal(imagePath, index) {
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    const closeBtn = document.getElementsByClassName('close')[0];
+    const prevBtn = document.getElementById('prevImage');
+    const nextBtn = document.getElementById('nextImage');
+
+    window.currentImageIndex = index;
+
+    async function loadImage(path) {
+        const fullSizeImageUrl = await getFullSizeImage(path);
+        modalImg.src = fullSizeImageUrl;
+    }
+
+    await loadImage(imagePath);
+    modal.style.display = 'block';
+
+    closeBtn.onclick = function() {
+        modal.style.display = 'none';
+    }
+
+    prevBtn.onclick = async function() {
+        if (window.currentImageIndex > 0) {
+            window.currentImageIndex--;
+            await loadImage(window.allMediaFiles[window.currentImageIndex].path_lower);
+        }
+    }
+
+    nextBtn.onclick = async function() {
+        if (window.currentImageIndex < window.allMediaFiles.length - 1) {
+            window.currentImageIndex++;
+            await loadImage(window.allMediaFiles[window.currentImageIndex].path_lower);
+        }
+    }
+
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    }
+}
+
+async function getFullSizeImage(path) {
+    try {
+        const response = await fetchWithRetry('https://content.dropboxapi.com/2/files/download', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Dropbox-API-Arg': JSON.stringify({
+                    path: path
+                })
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
+    } catch (error) {
+        console.error('Error fetching full-size image:', error);
+        return null;
+    }
+}
+
+function injectAdditionalStyles() {
+    const style = document.createElement('style');
+    style.textContent += `
+        .media-item-wrapper {
+            overflow: hidden;
+            cursor: pointer;
+        }
+        .media-item {
+            transition: all 0.3s ease;
+        }
+        .media-item:hover {
+            transform: scale(1.1);
+            opacity: 0.8;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            width: 80%;
+            max-width: 700px;
+        }
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+            .nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .nav-button:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        #prevImage {
+            left: 20px;
+        }
+        #nextImage {
+            right: 20px;
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+// Call this function after your existing injectStyles() call
+injectAdditionalStyles();
+
+
 /**
  * Main Function to List Folders and Display Images with Pagination
  */
@@ -552,19 +752,15 @@ async function listExactYearFolders(folderPath) {
     }
 
     try {
-        // Show spinner at the very start
         showSpinner();
-
         await refreshDropboxAccessToken();
 
-        // Ensure folderPath starts with '/'
         if (!folderPath.startsWith('/')) {
             folderPath = '/' + folderPath;
         }
 
         console.log(`Searching for '${year}' folder within '${folderPath}'...`);
 
-        // Use files/search_v2 to find the year folder within folderPath
         const searchResponse = await fetchWithRetry('https://api.dropboxapi.com/2/files/search_v2', {
             method: 'POST',
             headers: {
@@ -603,170 +799,47 @@ async function listExactYearFolders(folderPath) {
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No '${year}' folder found within '${folderPath}'.`;
             eventBentoGrid.appendChild(noResultsDiv);
-            hideSpinner(); // Hide spinner as loading is complete
+            hideSpinner();
             return;
         }
 
-        // Assuming we take the first match
         const yearFolderPath = yearFolderMatches[0].metadata.metadata.path_lower;
         console.log(`Found '${year}' folder at: ${yearFolderPath}`);
-
-        // Now list contents of the year folder
-        // Fetch all folder contents with handling for has_more
-        async function fetchAllFolderContents(folderPath) {
-            let allEntries = [];
-            let hasMore = true;
-            let cursor = null;
-
-            while (hasMore) {
-                let requestBody = {
-                    path: folderPath,
-                    recursive: false,
-                    include_media_info: false,
-                    include_deleted: false,
-                    include_has_explicit_shared_members: false,
-                    include_mounted_folders: false,
-                    limit: 2000
-                };
-
-                if (cursor) {
-                    requestBody = {
-                        cursor: cursor
-                    };
-                }
-
-                const endpoint = cursor ? 'https://api.dropboxapi.com/2/files/list_folder/continue' : 'https://api.dropboxapi.com/2/files/list_folder';
-
-                // Acquire API semaphore before making the request
-                await apiSemaphore.acquire();
-
-                try {
-                    const response = await fetchWithRetry(endpoint, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(requestBody)
-                    });
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`HTTP error on list_folder/continue for path ${folderPath}! status: ${response.status}, message: ${errorText}`);
-                    }
-
-                    const data = await response.json();
-
-                    allEntries = allEntries.concat(data.entries);
-                    hasMore = data.has_more;
-                    cursor = data.cursor;
-                } catch (error) {
-                    console.error(`Error fetching contents for folder "${extractFolderName(folderPath)}" (${folderPath}):`, error);
-                    throw error; // Rethrow to be caught by outer try-catch
-                } finally {
-                    // Release API semaphore
-                    apiSemaphore.release();
-                }
-            }
-
-            return allEntries;
-        }
 
         const entries = await fetchAllFolderContents(yearFolderPath);
 
         const eventBentoGrid = document.getElementById('event-bento-grid2');
-        if (!eventBentoGrid) {
-            console.error('Element with id "event-bento-grid2" not found');
-            hideSpinner(); // Hide spinner if grid is not found
+        const picturesInFolder = document.getElementById('pictures-in-folder');
+
+        if (!eventBentoGrid || !picturesInFolder) {
+            console.error('Required elements not found');
+            hideSpinner();
             return;
         }
 
         if (entries.length > 0) {
-            // Collect all folder items (subfolders within the year folder)
             const folderItems = entries.filter(item => item['.tag'] === 'folder').map(item => ({
                 path_lower: item.path_lower,
                 name: item.name
             }));
 
-            // Log all folder items to the console
             console.log(`Subfolders within '${year}':`, folderItems);
 
-            // Pagination Variables
             const itemsPerPage = 49;
             const totalPages = Math.ceil(folderItems.length / itemsPerPage);
             let currentPage = 1;
 
-            // Function to render a specific page
             async function renderPage(pageNumber) {
-                // Calculate start and end indices
                 const startIndex = (pageNumber - 1) * itemsPerPage;
                 const endIndex = startIndex + itemsPerPage;
                 const itemsToDisplay = folderItems.slice(startIndex, endIndex);
 
-                // Clear existing items in the grid
                 eventBentoGrid.innerHTML = '';
 
-                // Function to process and append a single folder item
-                async function processFolderItem(folder) {
-                    const imageData = await getMostRecentImageFromFolder(folder.path_lower);
-                    if (imageData && imageData.thumbnail) {
-                        // Create an 'a' element
-                        const folderLink = document.createElement('a');
-                        folderLink.className = 'folder-item';
-
-                        // Set the href attribute to include year and folderPath
-                        const encodedFolderPath = encodeURIComponent(folder.path_lower);
-                        const href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedFolderPath}`;
-                        folderLink.href = href;
-
-                        // Create an img element
-                        const img = document.createElement('img');
-                        img.alt = folder.name;
-                        img.loading = 'lazy';
-
-                        // Set the src attribute
-                        img.src = imageData.thumbnail;
-
-                        // Append the image to the folder link
-                        folderLink.appendChild(img);
-
-                        // Add Noise Overlay
-                        const noiseOverlay = document.createElement('div');
-                        noiseOverlay.className = 'noise-overlay';
-                        folderLink.appendChild(noiseOverlay);
-
-                        // Create a caption element with the folder's name
-                        const caption = document.createElement('div');
-                        caption.className = 'caption';
-                        caption.textContent = folder.name;
-
-                        // Append the caption to the folder link
-                        folderLink.appendChild(caption);
-
-                        // Append the folder link to the grid
-                        eventBentoGrid.appendChild(folderLink);
-                    }
-                }
-
-                // Fetch and render all items in parallel, respecting the concurrency limit
-                const MAX_RENDER_CONCURRENCY = API_CONCURRENCY_LIMIT;
-                const renderSemaphore = new Semaphore(MAX_RENDER_CONCURRENCY);
-
-                const renderPromises = itemsToDisplay.map(folder => (async () => {
-                    await renderSemaphore.acquire();
-                    try {
-                        await processFolderItem(folder);
-                    } finally {
-                        renderSemaphore.release();
-                    }
-                })());
-
-                // Wait for all render operations in the page to complete
+                const renderPromises = itemsToDisplay.map(folder => processFolderItem(folder));
                 await Promise.all(renderPromises);
 
-                // Use imagesLoaded to ensure all images are loaded before initializing Isotope
                 imagesLoaded(eventBentoGrid, function () {
-                    // Initialize or Update Isotope
                     if (!window.iso) {
                         window.iso = new Isotope(eventBentoGrid, {
                             itemSelector: '.folder-item',
@@ -782,36 +855,101 @@ async function listExactYearFolders(folderPath) {
                         window.iso.reloadItems();
                         window.iso.layout();
                     }
-
-                    // Set responsive columns
+        
                     setResponsiveColumns(eventBentoGrid, window.iso);
                 });
 
-                // Scroll to top of grid on page change
-                window.scrollTo({
-                    top: eventBentoGrid.offsetTop - 20,
-                    behavior: 'smooth'
-                });
-
-                // Update pagination controls
                 updatePaginationControls();
             }
 
-            // Function to create and update pagination controls
+            // New function to append images and videos to pictures-in-folder
+            async function appendMediaToPicturesInFolder() {
+                picturesInFolder.innerHTML = ''; // Clear existing content
+            
+                const mediaFiles = entries.filter(item => 
+                    item['.tag'] === 'file' && 
+                    /\.(jpg|jpeg|png|gif)$/i.test(item.name) // Only include image files
+                );
+            
+                window.allMediaFiles = mediaFiles; // Store all media files globally
+            
+                const appendPromises = mediaFiles.map(async (file, index) => {
+                    const fileWrapper = document.createElement('div');
+                    fileWrapper.className = 'media-item-wrapper';
+            
+                    const fileElement = document.createElement('img');
+                    fileElement.className = 'media-item';
+                    
+                    // Add click event for images to open modal
+                    fileElement.onclick = () => openImageModal(file.path_lower, index);
+            
+                    const thumbnailUrl = await getThumbnail(file.path_lower);
+                    fileElement.src = thumbnailUrl;
+                    fileElement.alt = file.name;
+            
+                    fileWrapper.appendChild(fileElement);
+                    picturesInFolder.appendChild(fileWrapper);
+                });
+            
+                await Promise.all(appendPromises);
+            
+                // Initialize Isotope for pictures-in-folder
+                imagesLoaded(picturesInFolder, function() {
+                    if (!window.isoPictures) {
+                        window.isoPictures = new Isotope(picturesInFolder, {
+                            itemSelector: '.media-item-wrapper',
+                            layoutMode: 'masonry',
+                            masonry: {
+                                columnWidth: '.media-item-wrapper',
+                                gutter: 10
+                            }
+                        });
+                    } else {
+                        window.isoPictures.reloadItems();
+                        window.isoPictures.layout();
+                    }
+                });
+            }
+
+            async function processFolderItem(folder) {
+                const imageData = await getMostRecentImageFromFolder(folder.path_lower);
+                if (imageData && imageData.thumbnail) {
+                    const folderLink = document.createElement('a');
+                    folderLink.className = 'folder-item';
+                    const encodedFolderPath = encodeURIComponent(folder.path_lower);
+                    folderLink.href = `family-pictures.html?year=${encodeURIComponent(year)}&path=${encodedFolderPath}`;
+
+                    const img = document.createElement('img');
+                    img.alt = folder.name;
+                    img.loading = 'lazy';
+                    img.src = imageData.thumbnail;
+
+                    folderLink.appendChild(img);
+
+                    const noiseOverlay = document.createElement('div');
+                    noiseOverlay.className = 'noise-overlay';
+                    folderLink.appendChild(noiseOverlay);
+
+                    const caption = document.createElement('div');
+                    caption.className = 'caption';
+                    caption.textContent = folder.name;
+
+                    folderLink.appendChild(caption);
+                    eventBentoGrid.appendChild(folderLink);
+                }
+            }
+
             function createPaginationControls() {
-                // Remove existing pagination controls if any
                 const existingControls = document.getElementById('pagination-controls');
                 if (existingControls) {
                     existingControls.remove();
                 }
 
-                // Do not create controls if only one page
                 if (totalPages <= 1) return;
 
                 const paginationDiv = document.createElement('div');
                 paginationDiv.id = 'pagination-controls';
 
-                // Previous Button
                 const prevButton = document.createElement('button');
                 prevButton.textContent = 'Previous';
                 prevButton.className = 'pagination-button';
@@ -827,7 +965,6 @@ async function listExactYearFolders(folderPath) {
                 };
                 paginationDiv.appendChild(prevButton);
 
-                // Page Numbers
                 for (let i = 1; i <= totalPages; i++) {
                     const pageButton = document.createElement('button');
                     pageButton.textContent = i;
@@ -842,7 +979,6 @@ async function listExactYearFolders(folderPath) {
                     paginationDiv.appendChild(pageButton);
                 }
 
-                // Next Button
                 const nextButton = document.createElement('button');
                 nextButton.textContent = 'Next';
                 nextButton.className = 'pagination-button';
@@ -858,34 +994,28 @@ async function listExactYearFolders(folderPath) {
                 };
                 paginationDiv.appendChild(nextButton);
 
-                // Append pagination controls after the grid
                 eventBentoGrid.parentNode.insertBefore(paginationDiv, eventBentoGrid.nextSibling);
             }
 
-            // Function to update pagination controls based on current page
             function updatePaginationControls() {
-                // Remove existing pagination controls
                 const existingControls = document.getElementById('pagination-controls');
                 if (existingControls) {
                     existingControls.remove();
                 }
-
-                // Recreate pagination controls
                 createPaginationControls();
             }
 
-            // Initial render
             await renderPage(currentPage);
+            await appendMediaToPicturesInFolder(); // Call the new function to append media
 
-            // Add event listener for window resize to adjust columns
             window.addEventListener('resize', debounce(() => {
                 setResponsiveColumns(eventBentoGrid, window.iso);
+                if (window.isoPictures) {
+                    window.isoPictures.layout();
+                }
             }, 200));
 
-            // Create pagination controls
             createPaginationControls();
-
-            // Hide spinner after all folders and images have been processed and rendered
             hideSpinner();
 
         } else {
@@ -900,12 +1030,19 @@ async function listExactYearFolders(folderPath) {
     } catch (error) {
         console.error('Error listing folders:', error);
         console.error('Error details:', error.message);
-
-        // Hide spinner in case of error
         hideSpinner();
-
         const errorDiv = document.createElement('div');
         errorDiv.textContent = `Error: ${error.message}`;
         document.getElementById('event-bento-grid2').appendChild(errorDiv);
     }
 }
+
+
+document.body.insertAdjacentHTML('beforeend', `
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <button id="prevImage" class="nav-button">&lt;</button>
+        <button id="nextImage" class="nav-button">&gt;</button>
+        <img class="modal-content" id="modalImage">
+    </div>
+`);

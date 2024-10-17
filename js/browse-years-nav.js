@@ -4,17 +4,35 @@ import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.
 
 const DROPBOX_API_URL = 'https://api.dropboxapi.com/2/files/list_folder';
 
-async function listFolder(path) {
+async function listFolderAll(path) {
     await refreshDropboxAccessToken();
-    const response = await fetch(DROPBOX_API_URL, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ path })
-    });
-    return response.json();
+    let entries = [];
+    let has_more = false;
+    let cursor = null;
+
+    do {
+        const url = has_more ? 'https://api.dropboxapi.com/2/files/list_folder/continue' : DROPBOX_API_URL;
+        const body = has_more ? { cursor } : { path, recursive: true };
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+        const result = await response.json();
+
+        if (result.error) {
+            throw new Error(JSON.stringify(result.error));
+        }
+
+        entries = entries.concat(result.entries);
+        has_more = result.has_more;
+        cursor = result.cursor;
+    } while (has_more);
+
+    return entries;
 }
 
 function isYearFolder(name) {
@@ -22,27 +40,14 @@ function isYearFolder(name) {
 }
 
 async function findYearFolders(path = '') {
-    const result = await listFolder(path);
-    const yearFolders = result.entries
+    const entries = await listFolderAll(path);
+
+    // Collect unique year folder names
+    const yearFolders = Array.from(new Set(entries
         .filter(entry => entry['.tag'] === 'folder' && isYearFolder(entry.name))
-        .map(entry => entry.name);
+        .map(entry => entry.name)));
 
-    if (yearFolders.length > 0) {
-        return yearFolders;
-    }
-
-    // If no year folders found, search in subfolders
-    const subfolders = result.entries
-        .filter(entry => entry['.tag'] === 'folder' && !isYearFolder(entry.name));
-
-    for (const folder of subfolders) {
-        const subYearFolders = await findYearFolders(folder.path_lower);
-        if (subYearFolders.length > 0) {
-            return subYearFolders;
-        }
-    }
-
-    return [];
+    return yearFolders;
 }
 
 function addYearLink(year, gridId) {

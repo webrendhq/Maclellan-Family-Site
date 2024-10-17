@@ -282,6 +282,80 @@ function injectStyles() {
             white-space: nowrap;
             border: 0;
         }
+                .nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            z-index: 1002;
+        }
+        .nav-button:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        #prevImage {
+            left: 20px;
+        }
+        #nextImage {
+            right: 20px;
+        }
+        #file-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+        }
+
+        #file-modal-body {
+            margin: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+        #file-modal-body img, #file-modal-body video {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            z-index: 1002;
+        }
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        #download-link {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            z-index: 1002;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -566,13 +640,36 @@ async function getThumbnails(filePath) {
     return thumbnails;
 }
 
+async function getTemporaryLink(filePath) {
+    try {
+        const response = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ path: filePath })
+        });
+
+        if (!response.ok) throw new Error('Failed to get temporary link');
+        const data = await response.json();
+        return data.link;
+    } catch (error) {
+        console.error('Error getting temporary link:', error);
+        return null;
+    }
+}
+
 /**
  * Function to open the modal and display the content
  */
-function openModal(tempLink, fileName, folderName) {
+function openModal(tempLink, fileName, folderName, index) {
     const modal = document.getElementById('file-modal');
     const modalBody = document.getElementById('file-modal-body');
-    const downloadLink = document.getElementById('download-link');
+    if (!modal || !modalBody) {
+        console.error('Modal elements not found');
+        return;
+    }
 
     // Clear previous content
     modalBody.innerHTML = '';
@@ -582,39 +679,28 @@ function openModal(tempLink, fileName, folderName) {
     const imageExtensions = ['jpg', 'jpeg', 'png', 'gif'];
     const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm'];
 
+    let mediaElement;
     if (imageExtensions.includes(extension)) {
-        // Create an image element
-        const img = document.createElement('img');
-        img.src = tempLink;
-        img.alt = fileName;
-        img.style.maxWidth = '100%';
-        img.style.maxHeight = '80vh'; // Limit height to viewport
-        img.style.objectFit = 'contain';
-        modalBody.appendChild(img);
+        mediaElement = document.createElement('img');
+        mediaElement.src = tempLink;
     } else if (videoExtensions.includes(extension)) {
-        // Create a video element
-        const video = document.createElement('video');
-        video.src = tempLink;
-        video.controls = true;
-        video.style.maxWidth = '100%';
-        video.style.maxHeight = '80vh';
-        video.style.objectFit = 'contain';
-        modalBody.appendChild(video);
+        mediaElement = document.createElement('video');
+        mediaElement.src = tempLink;
+        mediaElement.controls = true;
     } else {
-        // Unsupported file type
-        modalBody.textContent = 'Unsupported file type.';
+        mediaElement = document.createElement('div');
+        mediaElement.textContent = 'Unsupported file type';
     }
 
-    // Set the download link
-    downloadLink.href = tempLink;
-    downloadLink.download = fileName;
+    mediaElement.style.maxWidth = '100%';
+    mediaElement.style.maxHeight = '80vh';
+    mediaElement.alt = fileName;
+    modalBody.appendChild(mediaElement);
 
-    // Optionally, display the folder name as a caption in the modal
+    // Add folder name caption
     const folderCaption = document.createElement('div');
-    folderCaption.style.marginTop = '10px';
-    folderCaption.style.color = '#fff';
-    folderCaption.style.fontWeight = '800';
     folderCaption.textContent = `Folder: ${folderName}`;
+    folderCaption.style.marginTop = '10px';
     modalBody.appendChild(folderCaption);
 
     // Show the modal
@@ -853,82 +939,50 @@ async function renderPage(pageNumber) {
     /**
      * Function to process and append a single media item
      */
-    async function processMediaItem(file) {
+    async function processMediaItem(file, index) {
         const thumbnails = await getThumbnails(file.path_lower);
         if (thumbnails && thumbnails['w128h128']) {
-            // Create an 'a' element
-            const fileLink = document.createElement('a');
+            const fileLink = document.createElement('div'); // Changed to div
             fileLink.className = 'file-item';
-            fileLink.href = '#'; // Prevent default navigation
-            fileLink.style.position = 'relative'; // For positioning the delete button
-            fileLink.dataset.path = file.path_lower; // Add data attribute for easy selection
+            fileLink.style.position = 'relative';
+            fileLink.dataset.path = file.path_lower;
 
-            // Event listener for opening the modal
-            fileLink.addEventListener('click', async function(event) {
-                event.preventDefault();
-
-                // Get a temporary link to the file
-                let tempLink = '#'; // Default tempLink in case temporary link cannot be obtained
-
-                try {
-                    const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            path: file.path_lower
-                        })
-                    });
-
-                    if (tempLinkResponse.ok) {
-                        const tempLinkData = await tempLinkResponse.json();
-                        tempLink = tempLinkData.link;
-                    } else {
-                        const errorText = await tempLinkResponse.text();
-                        console.error(`Error getting temporary link: ${errorText}`);
-                    }
-                } catch (error) {
-                    console.error('Error getting temporary link:', error);
-                }
-
-                // Open the modal and display the content
-                openModal(tempLink, file.name, extractFolderName(path));
-            });
-
-            // Create an img element with fixed size
             const img = document.createElement('img');
-            img.alt = file.name; // Use file name as alt text
-            img.loading = 'lazy'; // Implement lazy loading
-
-            // Set the src to the 'w128h128' thumbnail
+            img.alt = file.name;
+            img.loading = 'lazy';
             img.src = thumbnails['w128h128'];
 
-            // Append the image to the file link
             fileLink.appendChild(img);
 
-            // **Add Noise Overlay**
             const noiseOverlay = document.createElement('div');
             noiseOverlay.className = 'noise-overlay';
             fileLink.appendChild(noiseOverlay);
-            // **End of Noise Overlay**
 
-            // Add delete button for admin users
             if (isAdmin) {
                 const deleteButton = createDeleteButton(file);
                 fileLink.appendChild(deleteButton);
             }
 
-            // Create a caption element with the file's name
             const caption = document.createElement('div');
             caption.className = 'caption';
-            caption.textContent = file.name; // Use file name for caption
-
-            // Append the caption to the file link
+            caption.textContent = file.name;
             fileLink.appendChild(caption);
 
-            // Append the file link to the grid
+            // Add click event listener to the fileLink
+            fileLink.addEventListener('click', async function(event) {
+                event.preventDefault();
+                try {
+                    const tempLink = await getTemporaryLink(file.path_lower);
+                    if (tempLink) {
+                        openModal(tempLink, file.name, extractFolderName(path), startIndex + index);
+                    } else {
+                        console.error('Failed to get temporary link for file:', file.name);
+                    }
+                } catch (error) {
+                    console.error('Error opening modal:', error);
+                }
+            });
+
             eventBentoGrid.appendChild(fileLink);
         }
     }
@@ -938,10 +992,10 @@ async function renderPage(pageNumber) {
         const MAX_RENDER_CONCURRENCY = API_CONCURRENCY_LIMIT; // Using the same as API semaphore
         const renderSemaphore = new Semaphore(MAX_RENDER_CONCURRENCY);
 
-        const renderPromises = items.map(file => (async () => {
+        const renderPromises = items.map((file, index) => (async () => {
             await renderSemaphore.acquire();
             try {
-                await processMediaItem(file);
+                await processMediaItem(file, index);
             } finally {
                 renderSemaphore.release();
             }
