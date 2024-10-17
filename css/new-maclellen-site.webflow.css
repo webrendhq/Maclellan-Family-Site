@@ -63,7 +63,7 @@ a:hover{
   z-index: auto;
   flex-flow: column;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: top;
   align-items: flex-start;
   width: 95%;
   margin-top: 0;

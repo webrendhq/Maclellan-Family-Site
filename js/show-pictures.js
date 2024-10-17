@@ -11,7 +11,7 @@ import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-
 
 // Initialize admin flag
 let isAdmin = false;
-
+let allMediaFiles = [];
 // Pagination Configuration
 const ITEMS_PER_PAGE = 49;
 let currentPage = 1;
@@ -788,30 +788,18 @@ function extractFolderName(path) {
     return parts[parts.length - 1] || 'Unnamed Folder';
 }
 
-/**
- * Function to create and update pagination controls
- */
+
 function createPaginationControls() {
-    // Remove existing pagination controls if any
-    const existingControls = document.getElementById('pagination-controls');
-    if (existingControls) {
-        existingControls.remove();
-    }
+    const paginationDiv = document.getElementById('pagination-controls');
+    if (!paginationDiv) return;
 
-    // Do not create controls if only one page
-    if (totalPages <= 1) return;
-
-    const paginationDiv = document.createElement('div');
-    paginationDiv.id = 'pagination-controls';
+    paginationDiv.innerHTML = ''; // Clear existing controls
 
     // Previous Button
     const prevButton = document.createElement('button');
     prevButton.textContent = 'Previous';
     prevButton.className = 'pagination-button';
-    if (currentPage === 1) {
-        prevButton.classList.add('disabled');
-        prevButton.disabled = true;
-    }
+    prevButton.disabled = currentPage === 1;
     prevButton.onclick = () => {
         if (currentPage > 1) {
             currentPage--;
@@ -820,14 +808,10 @@ function createPaginationControls() {
     };
     paginationDiv.appendChild(prevButton);
 
-    // Page Numbers (show limited page buttons for better UX)
-    const maxPageButtons = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
-    let endPage = startPage + maxPageButtons - 1;
-    if (endPage > totalPages) {
-        endPage = totalPages;
-        startPage = Math.max(1, endPage - maxPageButtons + 1);
-    }
+    // Page Numbers
+    const maxPageButtons = 5; // Maximum number of page buttons to show
+    const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+    const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
 
     for (let i = startPage; i <= endPage; i++) {
         const pageButton = document.createElement('button');
@@ -838,7 +822,7 @@ function createPaginationControls() {
         }
         pageButton.onclick = () => {
             currentPage = i;
-            renderPage(i);
+            renderPage(currentPage);
         };
         paginationDiv.appendChild(pageButton);
     }
@@ -847,10 +831,7 @@ function createPaginationControls() {
     const nextButton = document.createElement('button');
     nextButton.textContent = 'Next';
     nextButton.className = 'pagination-button';
-    if (currentPage === totalPages) {
-        nextButton.classList.add('disabled');
-        nextButton.disabled = true;
-    }
+    nextButton.disabled = currentPage === totalPages;
     nextButton.onclick = () => {
         if (currentPage < totalPages) {
             currentPage++;
@@ -858,12 +839,6 @@ function createPaginationControls() {
         }
     };
     paginationDiv.appendChild(nextButton);
-
-    // Append pagination controls after the grid
-    const eventBentoGrid = document.getElementById('event-n-year-bento-grid');
-    if (eventBentoGrid && eventBentoGrid.parentNode) {
-        eventBentoGrid.parentNode.insertBefore(paginationDiv, eventBentoGrid.nextSibling);
-    }
 }
 
 /**
@@ -969,6 +944,104 @@ async function fetchMediaFiles(folderPath) {
     return fetchedMediaFiles;
 }
 
+async function getFileLink(file) {
+    await refreshDropboxAccessToken();
+    let link = '#';
+
+    try {
+        const extension = file.name.split('.').pop().toLowerCase();
+        const unsupportedVideoExtensions = ['avi', 'mkv', 'wmv', 'flv'];
+
+        if (unsupportedVideoExtensions.includes(extension)) {
+            const sharedLinkResponse = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    path: file.path_lower,
+                    settings: {
+                        requested_visibility: 'public'
+                    }
+                })
+            });
+
+            if (sharedLinkResponse.ok) {
+                const sharedLinkData = await sharedLinkResponse.json();
+                link = sharedLinkData.url.replace('?dl=0', '?raw=1');
+            } else {
+                console.error(`Error creating shared link: ${await sharedLinkResponse.text()}`);
+            }
+        } else {
+            const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    path: file.path_lower
+                })
+            });
+
+            if (tempLinkResponse.ok) {
+                const tempLinkData = await tempLinkResponse.json();
+                link = tempLinkData.link;
+            } else {
+                console.error(`Error getting temporary link: ${await tempLinkResponse.text()}`);
+            }
+        }
+    } catch (error) {
+        console.error('Error getting link:', error);
+    }
+
+    return link;
+}
+
+async function processMediaItem(file, index) {
+    const thumbnails = await getThumbnails(file.path_lower);
+    if (thumbnails && thumbnails['w128h128']) {
+        const fileLink = document.createElement('a');
+        fileLink.className = 'file-item';
+        fileLink.href = '#';
+        fileLink.style.position = 'relative';
+        fileLink.dataset.path = file.path_lower;
+
+        fileLink.addEventListener('click', async function(event) {
+            event.preventDefault();
+            const link = await getFileLink(file);
+            openModal(link, file.name, extractFolderName(path), index);
+        });
+
+        const img = document.createElement('img');
+        img.alt = file.name;
+        img.loading = 'lazy';
+        img.src = thumbnails['w128h128'];
+
+        fileLink.appendChild(img);
+
+        const noiseOverlay = document.createElement('div');
+        noiseOverlay.className = 'noise-overlay';
+        fileLink.appendChild(noiseOverlay);
+
+        if (isAdmin) {
+            const deleteButton = createDeleteButton(file);
+            fileLink.appendChild(deleteButton);
+        }
+
+        const caption = document.createElement('div');
+        caption.className = 'caption';
+        caption.textContent = file.name;
+
+        fileLink.appendChild(caption);
+
+        const eventBentoGrid = document.getElementById('event-n-year-bento-grid');
+        eventBentoGrid.appendChild(fileLink);
+    }
+}
+
+
 /**
  * Function to render a specific page with media items
  */
@@ -979,7 +1052,7 @@ async function renderPage(pageNumber) {
     // Calculate start and end indices
     const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    const itemsToDisplay = mediaFiles.slice(startIndex, endIndex);
+    const itemsToDisplay = allMediaFiles.slice(startIndex, endIndex);
 
     // Clear existing items in the grid
     eventBentoGrid.innerHTML = '';
@@ -990,141 +1063,11 @@ async function renderPage(pageNumber) {
         window.iso = null;
     }
 
-    /**
-     * Function to process and append a single media item
-     */
-    async function processMediaItem(file, index) {
-        const thumbnails = await getThumbnails(file.path_lower);
-        if (thumbnails && thumbnails['w128h128']) {
-            // Create an 'a' element
-            const fileLink = document.createElement('a');
-            fileLink.className = 'file-item';
-            fileLink.href = '#'; // Prevent default navigation
-            fileLink.style.position = 'relative'; // For positioning the delete button
-            fileLink.dataset.path = file.path_lower; // Add data attribute for easy selection
-
-            // Event listener for opening the modal
-            fileLink.addEventListener('click', async function(event) {
-                event.preventDefault();
-
-                // Get a link to the file (temporary link or shared link)
-                let link = '#'; // Default link in case link cannot be obtained
-
-                try {
-                    const extension = file.name.split('.').pop().toLowerCase();
-                    const videoExtensions = ['mp4', 'mov', 'webm', 'ogg'];
-                    const unsupportedVideoExtensions = ['avi', 'mkv', 'wmv', 'flv'];
-
-                    if (unsupportedVideoExtensions.includes(extension)) {
-                        // Generate a shared link for unsupported video formats
-                        const sharedLinkResponse = await fetch('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                path: file.path_lower,
-                                settings: {
-                                    requested_visibility: 'public'
-                                }
-                            })
-                        });
-
-                        if (sharedLinkResponse.ok) {
-                            const sharedLinkData = await sharedLinkResponse.json();
-                            // Modify the URL to use the raw file
-                            link = sharedLinkData.url.replace('?dl=0', '?raw=1');
-                        } else {
-                            const errorText = await sharedLinkResponse.text();
-                            console.error(`Error creating shared link: ${errorText}`);
-                        }
-                    } else {
-                        // Get a temporary link for supported formats and images
-                        const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                path: file.path_lower
-                            })
-                        });
-
-                        if (tempLinkResponse.ok) {
-                            const tempLinkData = await tempLinkResponse.json();
-                            link = tempLinkData.link;
-                        } else {
-                            const errorText = await tempLinkResponse.text();
-                            console.error(`Error getting temporary link: ${errorText}`);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error getting link:', error);
-                }
-
-                // Open the modal and display the content
-                openModal(link, file.name, extractFolderName(path), index);
-            });
-
-            // Create an img element with fixed size
-            const img = document.createElement('img');
-            img.alt = file.name; // Use file name as alt text
-            img.loading = 'lazy'; // Implement lazy loading
-
-            // Set the src to the 'w128h128' thumbnail
-            img.src = thumbnails['w128h128'];
-
-            // Append the image to the file link
-            fileLink.appendChild(img);
-
-            // **Add Noise Overlay**
-            const noiseOverlay = document.createElement('div');
-            noiseOverlay.className = 'noise-overlay';
-            fileLink.appendChild(noiseOverlay);
-            // **End of Noise Overlay**
-
-            // Add delete button for admin users
-            if (isAdmin) {
-                const deleteButton = createDeleteButton(file);
-                fileLink.appendChild(deleteButton);
-            }
-
-            // Create a caption element with the file's name
-            const caption = document.createElement('div');
-            caption.className = 'caption';
-            caption.textContent = file.name; // Use file name for caption
-
-            // Append the caption to the file link
-            fileLink.appendChild(caption);
-
-            // Append the file link to the grid
-            eventBentoGrid.appendChild(fileLink);
-        }
+    // Process and append media items
+    for (let i = 0; i < itemsToDisplay.length; i++) {
+        const file = itemsToDisplay[i];
+        await processMediaItem(file, startIndex + i);
     }
-
-    // Function to manage concurrency when rendering items
-    async function renderItemsConcurrently(items, startIndex) {
-        const MAX_RENDER_CONCURRENCY = API_CONCURRENCY_LIMIT; // Using the same as API semaphore
-        const renderSemaphore = new Semaphore(MAX_RENDER_CONCURRENCY);
-
-        const renderPromises = items.map((file, localIndex) => (async () => {
-            await renderSemaphore.acquire();
-            try {
-                const index = startIndex + localIndex;
-                await processMediaItem(file, index);
-            } finally {
-                renderSemaphore.release();
-            }
-        })());
-
-        // Wait for all render operations in the page to complete
-        await Promise.all(renderPromises);
-    }
-
-    // Fetch and render all items concurrently
-    await renderItemsConcurrently(itemsToDisplay, startIndex);
 
     // Initialize Isotope after appending all file items
     imagesLoaded(eventBentoGrid, function () {
@@ -1135,7 +1078,7 @@ async function renderPage(pageNumber) {
             masonry: {
                 columnWidth: '.file-item',
                 horizontalOrder: true,
-                gutter: 16 // Set gutter to match CSS gap
+                gutter: 16
             }
         });
 
@@ -1144,7 +1087,7 @@ async function renderPage(pageNumber) {
     });
 
     // Update pagination controls
-    updatePaginationControls();
+    createPaginationControls();
 
     // Scroll to top of grid on page change
     window.scrollTo({
@@ -1152,6 +1095,25 @@ async function renderPage(pageNumber) {
         behavior: 'smooth'
     });
 }
+
+document.addEventListener("DOMContentLoaded", function() {
+    console.log("DOM is ready");
+    injectStyles();
+    injectModalHTML();
+    
+    // Check authentication state
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            window.location.href = '/sign-in.html';
+        } else {
+            // Check if the user is an admin
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            isAdmin = userDoc.exists() && userDoc.data().role === 'admin';
+            // Start listing images and videos
+            listImagesAndVideosInFolder();
+        }
+    });
+});
 
 /**
  * Function to list images and videos in a folder with pagination and masonry layout
@@ -1163,19 +1125,18 @@ async function listImagesAndVideosInFolder() {
     }
 
     try {
-        // Show spinner at the very start
         showSpinner();
 
         await refreshDropboxAccessToken();
         console.log(`Listing images and videos in folder '${path}' for year '${year}'...`);
 
-        // Fetch media files with concurrency control
-        mediaFiles = await fetchMediaFiles(path);
+        // Fetch all media files
+        allMediaFiles = await fetchMediaFiles(path);
 
         const eventBentoGrid = document.getElementById('event-n-year-bento-grid');
         if (!eventBentoGrid) {
             console.error('Element with id "event-n-year-bento-grid" not found');
-            hideSpinner(); // Hide spinner if grid is not found
+            hideSpinner();
             return;
         }
 
@@ -1183,27 +1144,21 @@ async function listImagesAndVideosInFolder() {
         eventBentoGrid.innerHTML = '';
 
         // Pagination setup
-        totalPages = Math.ceil(mediaFiles.length / ITEMS_PER_PAGE);
+        totalPages = Math.ceil(allMediaFiles.length / ITEMS_PER_PAGE);
         currentPage = 1;
 
-        if (mediaFiles.length > 0) {
+        if (allMediaFiles.length > 0) {
             // Render the first page
             await renderPage(currentPage);
         } else {
             const noResultsDiv = document.createElement('div');
             noResultsDiv.textContent = `No images or videos found in the folder '${path}'.`;
             eventBentoGrid.appendChild(noResultsDiv);
-            hideSpinner();
-            return;
         }
 
-        // Create pagination controls
-        createPaginationControls();
-
-        // Hide spinner after all folders and images have been processed and rendered
         hideSpinner();
 
-        // Add event listener for window resize to adjust columns
+        // Add event listener for window resize
         window.addEventListener('resize', debounce(() => {
             if (window.iso) {
                 setResponsiveColumns(eventBentoGrid, window.iso);
@@ -1213,8 +1168,6 @@ async function listImagesAndVideosInFolder() {
         console.log(`Finished listing images and videos for folder '${path}'.`);
     } catch (error) {
         console.error('Error listing images and videos:', error);
-        console.error('Error details:', error.message);
-
         hideSpinner();
 
         const errorDiv = document.createElement('div');

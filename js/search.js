@@ -176,6 +176,62 @@ function injectStyles() {
             font-weight: bold;
             cursor: pointer;
         }
+        .loader-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #main-content {
+            display: none;
+        }
+        .video-thumbnail {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3;
+        }
+
+        .modal-video {
+            width: 80%;
+            max-height: 80vh;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -268,7 +324,13 @@ async function renderPage() {
     const loadImage = async (file, index) => {
         if (file['.tag'] === 'file') {
             const fileExtension = file.name.split('.').pop().toLowerCase();
-            if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
+
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+            const videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'mkv', 'webm'];
+
+            if (imageExtensions.includes(fileExtension) || videoExtensions.includes(fileExtension)) {
+                let fileType = imageExtensions.includes(fileExtension) ? 'image' : 'video';
+
                 try {
                     const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
                         method: 'POST',
@@ -283,31 +345,38 @@ async function renderPage() {
                         const tempLinkData = await tempLinkResponse.json();
                         const tempLinkUrl = tempLinkData.link;
 
-                        const thumbnailResponse = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Dropbox-API-Arg': JSON.stringify({
-                                    path: file.path_lower,
-                                    format: 'jpeg',
-                                    size: 'w256h256'
-                                })
+                        // Function to fetch thumbnail
+                        const fetchThumbnail = async (size) => {
+                            const thumbnailResponse = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${accessToken}`,
+                                    'Dropbox-API-Arg': JSON.stringify({
+                                        path: file.path_lower,
+                                        format: 'jpeg',
+                                        size: size
+                                    })
+                                }
+                            });
+
+                            if (!thumbnailResponse.ok) {
+                                console.error('Error getting thumbnail:', thumbnailResponse.statusText);
+                                return null;
                             }
-                        });
 
-                        if (!thumbnailResponse.ok) {
-                            console.error('Error getting thumbnail:', thumbnailResponse.statusText);
-                            return;
-                        }
+                            return await thumbnailResponse.blob();
+                        };
 
-                        const previewData = await thumbnailResponse.blob();
-                        let previewUrl = URL.createObjectURL(previewData);
+                        // Fetch low-res thumbnail
+                        const lowResData = await fetchThumbnail('w32h32');
+                        let lowResUrl = lowResData ? URL.createObjectURL(lowResData) : null;
 
                         const folderLink = document.createElement('a');
                         folderLink.className = 'folder-item';
+                        folderLink.dataset.fileType = fileType; // 'image' or 'video'
 
                         const img = document.createElement('img');
-                        img.src = previewUrl;
+                        img.src = lowResUrl;
                         img.style.width = '100%';
                         img.style.height = '100%';
                         img.style.objectFit = 'cover';
@@ -324,16 +393,52 @@ async function renderPage() {
                         caption.textContent = file.name;
                         folderLink.appendChild(caption);
 
+                        // For videos, add a play icon overlay
+                        if (fileType === 'video') {
+                            const playIcon = document.createElement('div');
+                            playIcon.className = 'play-icon';
+                            playIcon.innerHTML = '&#9658;'; // Unicode for play symbol
+                            folderLink.appendChild(playIcon);
+                        }
+
                         folderLink.addEventListener('click', function(event){
                             event.preventDefault();
-                            const modal = document.getElementById('image-modal');
+
+                            const fileType = this.dataset.fileType;
+                            const tempLinkUrl = this.dataset.tempLinkUrl;
+
+                            const modal = document.getElementById('media-modal');
                             const modalImg = document.getElementById('modal-image');
+                            const modalVideo = document.getElementById('modal-video');
+
                             modal.style.display = 'block';
-                            modalImg.src = this.dataset.tempLinkUrl;
+
+                            if (fileType === 'image') {
+                                modalImg.style.display = 'block';
+                                modalVideo.style.display = 'none';
+                                modalImg.src = tempLinkUrl;
+                                // Adjust image size after it loads
+                                modalImg.onload = function() {
+                                    adjustModalImageSize(this);
+                                };
+                            } else if (fileType === 'video') {
+                                modalImg.style.display = 'none';
+                                modalVideo.style.display = 'block';
+                                modalVideo.src = tempLinkUrl;
+                                modalVideo.play();
+                            }
                         });
 
                         container.appendChild(folderLink);
                         imageObserver.observe(img);
+
+                        // Fetch high-res thumbnail in the background
+                        fetchThumbnail('w128h128').then(highResData => {
+                            if (highResData) {
+                                const highResUrl = URL.createObjectURL(highResData);
+                                img.src = highResUrl;
+                            }
+                        });
 
                         // Reinitialize Isotope after each image is added
                         imagesLoaded(container, function () {
@@ -363,6 +468,10 @@ async function renderPage() {
     }
 
     createPaginationControls();
+    if (currentPage === 1) {
+        document.querySelector('.loader-container').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+    }
 }
 
 function createPaginationControls() {
@@ -382,6 +491,7 @@ function createPaginationControls() {
         container.appendChild(button);
     }
 }
+
 
 // Load the specified page of results
 function loadPage(page) {
@@ -404,9 +514,14 @@ async function handleSearch(query) {
     if (query) {
         updateURLWithQuery(query);
         currentPage = 1;  // Reset pagination
+        
+        // Show the loader before starting the search
+        document.querySelector('.loader-container').style.display = 'flex';
+        document.getElementById('main-content').style.display = 'none';
+        
         allSearchResults = await searchDropboxFiles(query);
         totalPages = Math.ceil(allSearchResults.length / itemsPerPage);
-        renderPage();
+        await renderPage();  // Wait for renderPage to complete
     }
 }
 
@@ -428,38 +543,103 @@ function initialize() {
     console.log("Initializing...");
     refreshDropboxAccessToken().then(() => {
         console.log("Dropbox token refreshed");
-        initializeSearchFromURL();
+        return initializeSearchFromURL();
     }).catch(error => {
         console.error("Error during initialization:", error);
+        // In case of error, still hide the loader and show an error message
+        document.querySelector('.loader-container').style.display = 'none';
+        document.getElementById('main-content').innerHTML = '<p>An error occurred. Please try refreshing the page.</p>';
+        document.getElementById('main-content').style.display = 'block';
     });
 }
+
 
 // Check if DOM is ready
 document.addEventListener("DOMContentLoaded", function() {
     console.log("DOM is ready");
+    // injectStyles();
+    injectModalHTML();
     initialize();
 });
 
+function adjustModalImageSize(img) {
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const imageAspectRatio = img.naturalWidth / img.naturalHeight;
+    const windowAspectRatio = windowWidth / windowHeight;
+
+    if (imageAspectRatio > windowAspectRatio) {
+        // Image is wider than the window
+        img.style.width = '90%';
+        img.style.height = 'auto';
+    } else {
+        // Image is taller than the window
+        img.style.height = '90%';
+        img.style.width = 'auto';
+    }
+}
+
 // Add modal HTML to the page
 function injectModalHTML() {
+    const loaderHTML = `
+        <div class="loader-container">
+            <div class="loader"></div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('afterbegin', loaderHTML);
+
+    // Wrap the existing content in a main-content div
+    const mainContent = document.createElement('div');
+    mainContent.id = 'main-content';
+    while (document.body.firstChild) {
+        if (document.body.firstChild.className !== 'loader-container') {
+            mainContent.appendChild(document.body.firstChild);
+        } else {
+            break;
+        }
+    }
+    document.body.appendChild(mainContent);
+
     const modalHTML = `
-        <div id="image-modal" class="modal">
+        <div id="media-modal" class="modal">
             <span class="close">&times;</span>
-            <img class="modal-content" id="modal-image">
+            <img class="modal-content" id="modal-image" style="display:none;">
+            <video class="modal-content" id="modal-video" controls style="display:none;"></video>
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
     // Close modal when the close button is clicked
     document.querySelector('.close').addEventListener('click', function(){
-        document.getElementById('image-modal').style.display = 'none';
+        const modal = document.getElementById('media-modal');
+        const modalVideo = document.getElementById('modal-video');
+        modal.style.display = 'none';
+        if (modalVideo.style.display !== 'none') {
+            modalVideo.pause();
+            modalVideo.currentTime = 0;
+        }
     });
 
-    // Close modal when clicking outside the image
-    document.getElementById('image-modal').addEventListener('click', function(event){
+    // Close modal when clicking outside the media
+    document.getElementById('media-modal').addEventListener('click', function(event){
         if (event.target == this) {
             this.style.display = 'none';
+            const modalVideo = document.getElementById('modal-video');
+            if (modalVideo.style.display !== 'none') {
+                modalVideo.pause();
+                modalVideo.currentTime = 0;
+            }
         }
+    });
+
+    // Adjust media size when window is resized
+    window.addEventListener('resize', function() {
+        const modalImg = document.getElementById('modal-image');
+        const modalVideo = document.getElementById('modal-video');
+        if (modalImg.style.display !== 'none') {
+            adjustModalImageSize(modalImg);
+        }
+        // For videos, you can add a similar function if needed
     });
 }
 injectModalHTML();
