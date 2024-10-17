@@ -87,12 +87,14 @@ async function main() {
                     
                     // Find year folders under folderPath for 'your-years'
                     const yourYearFolders = await findYearFolders(folderPath);
+                    yourYearFolders.sort((a, b) => b - a); // Sort years in descending order
                     yourYearFolders.forEach(year => {
                         addYearLink(year, 'your-years');
                     });
                     
                     // Also find year folders under root for 'family-years'
                     const familyYearFolders = await findYearFolders('');
+                    familyYearFolders.sort((a, b) => b - a); // Sort years in descending order
                     familyYearFolders.forEach(year => {
                         addYearLink(year, 'family-years');
                     });

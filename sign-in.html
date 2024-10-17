@@ -100,10 +100,11 @@
 
 <body>
   <div class="signup-page-wrapper">
-    <div style="display:flex" class="signup-wrap">
+    <div style="display:none;opacity:0" class="signin-wrap">
       <div class="signup-header-circle green"></div>
       <div class="signup-header-circle"></div>
       <div class="signup-wrapper-head">
+        
         <div class="log-in__h">Create an <br>account</div>
       </div>
       <div class="no-margin-2 w-form">
@@ -132,7 +133,7 @@
           </div>
           <button class="button-3 w-button" id="signup-button" type="submit">Sign Up</button>   
           <div>
-            <p class="signup-back-link">Have an account? <a href="#" data-w-id="56ed0b27-5b1f-0190-b5fb-96cd60c6d1a6" class="link">Log in here</a><br></p>
+            <p class="signup-back-link">Have an account? <a href="#" data-w-id="7d5fcf02-e0bb-ce50-83ac-711ca91474f2" class="link-2">Log in</a><br></p>
           </div>
           <p id="signup-error-message" class="error-message"></p>
         </form>
@@ -144,14 +145,14 @@
         </div>
       </div>
     </div>
-    
-    <div style="display:none;opacity:0" class="signin-wrap">
+    <div style="display:flex" class="signup-wrap">
       <div class="signup-header-circle green"></div>
       <div class="signup-header-circle"></div>
       <div class="signup-wrapper-head">
         <div class="log-in__h">Log In </div>
       </div>
       <div class="no-margin-2 w-form">
+
         <form id="signin-form" method="POST" action="javascript:void(0);" class="signup-container">
           <a href="#" class="login-logo w-inline-block"></a>
           <div class="input-wrapper">
@@ -172,7 +173,8 @@
           </div>
           <button class="button-3 w-button" id="signin-button" type="submit">Sign In</button> 
           <div>
-            <p class="signup-back-link">Don't have an account? <a href="#" data-w-id="7d5fcf02-e0bb-ce50-83ac-711ca91474f2" class="link-2">Sign up</a><br></p>
+            
+            <p class="signup-back-link">Don't have an account? <a href="#" data-w-id="56ed0b27-5b1f-0190-b5fb-96cd60c6d1a6" class="link">Sign Up</a><br></p>
             <!-- Added Forgot Password Link Below -->
             <p class="signup-back-link"><a href="#" id="openForgotPasswordModal" class="link-2">Forgot Password?</a></p>
           </div>
@@ -185,7 +187,11 @@
           <div>Oops! Something went wrong while submitting the form.</div>
         </div>
       </div>
+      <!---->
+      
     </div>
+    
+
     
     <div class="bg-blob right"></div>
     <div class="bg-blob"></div>
