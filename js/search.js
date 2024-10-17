@@ -19,12 +19,10 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-let cursor = null;
-let startIndex = 0;
+let allSearchResults = [];
 let currentQuery = "";
-let hasMore = false;
 let currentPage = 1;
-const itemsPerPage = 12;
+const itemsPerPage = 50;
 let totalPages = 1;
 
 // Function to update the URL with the search query
@@ -40,13 +38,7 @@ function getQueryFromURL() {
     return urlParams.get('query') || "";
 }
 
-// Function to check for additional URL parameters and adjust the number of appended elements
-function getAdditionalParam() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return parseInt(urlParams.get('adjust')) || 0; // Default adjustment is 0 if not present
-}
-
-// Inject necessary CSS styles for the noise overlay and pagination
+// Inject necessary CSS styles for the noise overlay, pagination, and modal
 function injectStyles() {
     const style = document.createElement('style');
     style.textContent = `
@@ -153,6 +145,37 @@ function injectStyles() {
             background-color: #0056b3;
             font-weight: bold;
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            padding-top: 100px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 80%;
+            max-height: 80%;
+        }
+
+        .close {
+            position: absolute;
+            top: 50px;
+            right: 50px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -177,79 +200,74 @@ function createObserver() {
 const imageObserver = createObserver();
 
 // Fetch Dropbox files and append results
-async function searchDropboxFiles(query, startIndex = 0) {
+async function searchDropboxFiles(query) {
     console.log("Searching Dropbox files with query:", query);
     await refreshDropboxAccessToken(); // Ensure the access token is fresh
     let searchResults = [];
-    
+    let hasMore = true;
+    let cursor = null;
+
     try {
-        if (!cursor) {
-            // Initial search request
-            const response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    query: query,
-                    options: { max_results: 100 }
-                })
-            });
+        while (hasMore) {
+            let response;
+            if (!cursor) {
+                // Initial search request
+                response = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        options: { max_results: 1000 }
+                    })
+                });
+            } else {
+                // Continue from where we left off
+                response = await fetch('https://api.dropboxapi.com/2/files/search/continue_v2', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        cursor: cursor
+                    })
+                });
+            }
 
             if (response.ok) {
                 const data = await response.json();
-                searchResults = data.matches.map(match => match.metadata.metadata);
-                cursor = data.has_more ? data.cursor : null;
+                const matches = data.matches.map(match => match.metadata.metadata);
+                searchResults = searchResults.concat(matches);
                 hasMore = data.has_more;
+                cursor = hasMore ? data.cursor : null;
             } else {
                 console.error('Error searching Dropbox files:', response.statusText);
-            }
-        } else {
-            // Continue from where we left off
-            const response = await fetch('https://api.dropboxapi.com/2/files/search/continue_v2', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    cursor: cursor
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                searchResults = data.matches.map(match => match.metadata.metadata);
-                cursor = data.has_more ? data.cursor : null;
-                hasMore = data.has_more;
-            } else {
-                console.error('Error continuing search for Dropbox files:', response.statusText);
+                hasMore = false; // Stop loop on error
             }
         }
     } catch (error) {
         console.error('Error during search:', error);
     }
 
-    console.log("Search results:", searchResults);
+    console.log("Total search results:", searchResults.length);
     return searchResults;
 }
 
 // Pagination and render logic
-async function renderPage(results) {
+async function renderPage() {
     const container = document.getElementById('search-grid');
     container.innerHTML = '';  // Clear previous results
 
-    // Get the adjustment value from URL param (subtract 1 if applicable)
-    const adjustment = getAdditionalParam();
-    let adjustedItemsPerPage = itemsPerPage + adjustment;  // Adjust the number of items to append
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageResults = allSearchResults.slice(startIndex, endIndex);
 
-    results.slice(0, adjustedItemsPerPage).forEach(async (file, index) => {
+    const loadImage = async (file, index) => {
         if (file['.tag'] === 'file') {
             const fileExtension = file.name.split('.').pop().toLowerCase();
-            let format = 'jpeg';  // Default format
-
-            // Check for specific image or video file extensions
             if (['jpg', 'jpeg', 'png', 'gif'].includes(fileExtension)) {
                 try {
                     const tempLinkResponse = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
@@ -261,25 +279,27 @@ async function renderPage(results) {
                         body: JSON.stringify({ path: file.path_lower })
                     });
 
-                    const thumbnailResponse = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Dropbox-API-Arg': JSON.stringify({
-                                path: file.path_lower,
-                                format: format,
-                                size: 'w256h256'
-                            })
-                        }
-                    });
-
-                    if (!thumbnailResponse.ok) {
-                        console.error('Error getting thumbnail:', thumbnailResponse.statusText);
-                        return;
-                    }
-
                     if (tempLinkResponse.ok) {
                         const tempLinkData = await tempLinkResponse.json();
+                        const tempLinkUrl = tempLinkData.link;
+
+                        const thumbnailResponse = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Dropbox-API-Arg': JSON.stringify({
+                                    path: file.path_lower,
+                                    format: 'jpeg',
+                                    size: 'w256h256'
+                                })
+                            }
+                        });
+
+                        if (!thumbnailResponse.ok) {
+                            console.error('Error getting thumbnail:', thumbnailResponse.statusText);
+                            return;
+                        }
+
                         const previewData = await thumbnailResponse.blob();
                         let previewUrl = URL.createObjectURL(previewData);
 
@@ -293,41 +313,54 @@ async function renderPage(results) {
                         img.style.objectFit = 'cover';
 
                         folderLink.appendChild(img);
+                        folderLink.dataset.tempLinkUrl = tempLinkUrl;
 
-                        // Add noise overlay
                         const noiseOverlay = document.createElement('div');
                         noiseOverlay.className = 'noise-overlay';
                         folderLink.appendChild(noiseOverlay);
 
-                        // Caption
                         const caption = document.createElement('div');
                         caption.className = 'caption';
                         caption.textContent = file.name;
                         folderLink.appendChild(caption);
 
+                        folderLink.addEventListener('click', function(event){
+                            event.preventDefault();
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modal.style.display = 'block';
+                            modalImg.src = this.dataset.tempLinkUrl;
+                        });
+
                         container.appendChild(folderLink);
                         imageObserver.observe(img);
+
+                        // Reinitialize Isotope after each image is added
+                        imagesLoaded(container, function () {
+                            const iso = new Isotope(container, {
+                                itemSelector: '.folder-item',
+                                layoutMode: 'masonry',
+                                percentPosition: true,
+                                masonry: {
+                                    columnWidth: '.folder-item',
+                                    horizontalOrder: true,
+                                    gutter: 4
+                                }
+                            });
+                        });
                     }
                 } catch (error) {
                     console.error('Error fetching thumbnail or temp link:', error);
                 }
             }
         }
-    });
+    };
 
-    // Initialize Isotope for masonry layout after images load
-    imagesLoaded(container, function () {
-        const iso = new Isotope(container, {
-            itemSelector: '.folder-item',
-            layoutMode: 'masonry',
-            percentPosition: true,
-            masonry: {
-                columnWidth: '.folder-item',
-                horizontalOrder: true,
-                gutter: 4
-            }
-        });
-    });
+    for (let i = 0; i < pageResults.length; i++) {
+        await loadImage(pageResults[i], i);
+        // Add a delay between requests to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
 
     createPaginationControls();
 }
@@ -344,7 +377,6 @@ function createPaginationControls() {
         }
         button.textContent = i;
         button.addEventListener('click', () => {
-            currentPage = i;
             loadPage(i);
         });
         container.appendChild(button);
@@ -352,10 +384,9 @@ function createPaginationControls() {
 }
 
 // Load the specified page of results
-async function loadPage(page) {
-    const startIndex = (page - 1) * itemsPerPage;
-    const results = await searchDropboxFiles(currentQuery, startIndex);
-    renderPage(results);
+function loadPage(page) {
+    currentPage = page;
+    renderPage();
 }
 
 // Separate function to initialize search from URL
@@ -373,8 +404,9 @@ async function handleSearch(query) {
     if (query) {
         updateURLWithQuery(query);
         currentPage = 1;  // Reset pagination
-        const results = await searchDropboxFiles(query);
-        renderPage(results);
+        allSearchResults = await searchDropboxFiles(query);
+        totalPages = Math.ceil(allSearchResults.length / itemsPerPage);
+        renderPage();
     }
 }
 
@@ -407,3 +439,27 @@ document.addEventListener("DOMContentLoaded", function() {
     console.log("DOM is ready");
     initialize();
 });
+
+// Add modal HTML to the page
+function injectModalHTML() {
+    const modalHTML = `
+        <div id="image-modal" class="modal">
+            <span class="close">&times;</span>
+            <img class="modal-content" id="modal-image">
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Close modal when the close button is clicked
+    document.querySelector('.close').addEventListener('click', function(){
+        document.getElementById('image-modal').style.display = 'none';
+    });
+
+    // Close modal when clicking outside the image
+    document.getElementById('image-modal').addEventListener('click', function(event){
+        if (event.target == this) {
+            this.style.display = 'none';
+        }
+    });
+}
+injectModalHTML();
