@@ -13,7 +13,7 @@ import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-
 let isAdmin = false;
 let allMediaFiles = [];
 // Pagination Configuration
-const ITEMS_PER_PAGE = 49;
+const ITEMS_PER_PAGE = 50; // Display 50 items per page
 let currentPage = 1;
 let totalPages = 1;
 
@@ -128,7 +128,7 @@ function injectStyles() {
             justify-content: center;
             border-radius: 8px;
             margin-bottom: 16px;
-            background-color: #000; /* Optional: Background color for better noise overlay visibility */
+            background-color: #000;
         }
 
         /* Hover effect with box shadow and slight scale-up */
@@ -243,6 +243,12 @@ function injectStyles() {
         .pagination-button.active {
             background-color: #0056b3;
             font-weight: bold;
+        }
+
+        /* Ellipsis Styling */
+        .pagination-ellipsis {
+            padding: 8px 12px;
+            color: #333;
         }
 
         /* Loading Spinner Styles */
@@ -788,7 +794,6 @@ function extractFolderName(path) {
     return parts[parts.length - 1] || 'Unnamed Folder';
 }
 
-
 function createPaginationControls() {
     const paginationDiv = document.getElementById('pagination-controls');
     if (!paginationDiv) return;
@@ -808,24 +813,58 @@ function createPaginationControls() {
     };
     paginationDiv.appendChild(prevButton);
 
-    // Page Numbers
-    const maxPageButtons = 5; // Maximum number of page buttons to show
-    const startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
-    const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+    // Calculate page numbers to display
+    const maxPageButtons = 7; // You can adjust this number
+    let pageButtons = [];
 
-    for (let i = startPage; i <= endPage; i++) {
-        const pageButton = document.createElement('button');
-        pageButton.textContent = i;
-        pageButton.className = 'pagination-button';
-        if (i === currentPage) {
-            pageButton.classList.add('active');
+    if (totalPages <= maxPageButtons) {
+        // Display all page buttons
+        for (let i = 1; i <= totalPages; i++) {
+            pageButtons.push(i);
         }
-        pageButton.onclick = () => {
-            currentPage = i;
-            renderPage(currentPage);
-        };
-        paginationDiv.appendChild(pageButton);
+    } else {
+        // Display first page, ellipsis, current page vicinity, ellipsis, last page
+        pageButtons.push(1);
+
+        let startPage = Math.max(2, currentPage - 1);
+        let endPage = Math.min(totalPages - 1, currentPage + 1);
+
+        if (startPage > 2) {
+            pageButtons.push('...');
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageButtons.push(i);
+        }
+
+        if (endPage < totalPages - 1) {
+            pageButtons.push('...');
+        }
+
+        pageButtons.push(totalPages);
     }
+
+    // Create page number buttons
+    pageButtons.forEach(page => {
+        if (page === '...') {
+            const ellipsis = document.createElement('span');
+            ellipsis.textContent = '...';
+            ellipsis.className = 'pagination-ellipsis';
+            paginationDiv.appendChild(ellipsis);
+        } else {
+            const pageButton = document.createElement('button');
+            pageButton.textContent = page;
+            pageButton.className = 'pagination-button';
+            if (page === currentPage) {
+                pageButton.classList.add('active');
+            }
+            pageButton.onclick = () => {
+                currentPage = page;
+                renderPage(currentPage);
+            };
+            paginationDiv.appendChild(pageButton);
+        }
+    });
 
     // Next Button
     const nextButton = document.createElement('button');
@@ -1041,7 +1080,6 @@ async function processMediaItem(file, index) {
     }
 }
 
-
 /**
  * Function to render a specific page with media items
  */
@@ -1051,7 +1089,7 @@ async function renderPage(pageNumber) {
 
     // Calculate start and end indices
     const startIndex = (pageNumber - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, allMediaFiles.length);
     const itemsToDisplay = allMediaFiles.slice(startIndex, endIndex);
 
     // Clear existing items in the grid
@@ -1064,6 +1102,7 @@ async function renderPage(pageNumber) {
     }
 
     // Process and append media items
+    mediaFiles = itemsToDisplay; // Update mediaFiles for modal navigation
     for (let i = 0; i < itemsToDisplay.length; i++) {
         const file = itemsToDisplay[i];
         await processMediaItem(file, startIndex + i);
@@ -1099,7 +1138,7 @@ async function renderPage(pageNumber) {
 document.addEventListener("DOMContentLoaded", function() {
     console.log("DOM is ready");
     injectStyles();
-    injectModalHTML();
+    createLoadingSpinner();
     
     // Check authentication state
     onAuthStateChanged(auth, async (user) => {
