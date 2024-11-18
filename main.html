@@ -2,25 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Login</title>
+    <title>Select Year</title>
     <link rel="stylesheet" href="css/styles.css">
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <!-- AWS SDK -->
+    <!-- Add this script tag in the head section of your HTML files -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1191.0.min.js"></script>
+
 </head>
 <body>
-    <h1>Login</h1>
-    <div id="login-form">
-        <input type="email" id="email" placeholder="Email"><br>
-        <input type="password" id="password" placeholder="Password"><br>
-        <button id="login-btn">Login</button>
+    <button onclick="window.location.href='settings.html'" class="settings-button">
+        <img src="settings-icon.png" alt="Settings icon"> Settings
+    </button>
+    <h1>Select Year</h1>
+    <div id="viewport">
+        <div id="container"></div>
     </div>
-    <!-- Error message display area -->
-    <div id="error-message" style="color: red; margin-top: 10px;"></div>
-    <!-- Corrected script path -->
-    <script src="javascript/script.js"></script>
+    <div id="error-message"></div>
+
+
+
+    <script src="javascript\script.js"></script>
 </body>
 </html>
