@@ -20,7 +20,6 @@ permissions:
   id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -36,70 +35,54 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@8575951200e472d5f2d95c625da0c7bec8217c42 # v1.161.0
         with:
-          ruby-version: '3.1' # Not needed with a .ruby-version file
-          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
-          cache-version: 0 # Increment this number if you need to re-download cached gems
+          ruby-version: '3.1'
+          bundler-cache: true
+          cache-version: 0
 
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
 
-      # Create the config files with secrets before Jekyll builds
-      - name: Create JavaScript config files
+      # Modify your HTML files to include environment variables
+      - name: Inject environment variables
         run: |
-          # Create javascript/config.js with Firebase and AWS configs
-          cat > javascript/config.js <<EOL
-          const firebaseConfig = {
-              apiKey: "${{ secrets.FIREBASE_API_KEY }}",
-              authDomain: "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
-              projectId: "${{ secrets.FIREBASE_PROJECT_ID }}",
-              storageBucket: "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
-              messagingSenderId: "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
-              appId: "${{ secrets.FIREBASE_APP_ID }}"
-          };
-
-          // AWS S3 Configuration
-          const S3_BUCKET = "${{ secrets.AWS_S3_BUCKET || 'maclellanfamily.com' }}";
-          const S3_REGION = "${{ secrets.AWS_S3_REGION || 'us-east-2' }}";
-          const BASE_FOLDER = "${{ secrets.AWS_BASE_FOLDER || '0 US' }}";
-          const URL_EXPIRATION = parseInt("${{ secrets.URL_EXPIRATION || '3600' }}");
-
-          // Export configurations
-          export { 
-              firebaseConfig,
-              S3_BUCKET,
-              S3_REGION,
-              BASE_FOLDER,
-              URL_EXPIRATION
-          };
-
-          // Function to fetch S3 credentials
-          export async function fetchS3Credentials() {
-              try {
-                  const s3Client = new AWS.S3({
-                      accessKeyId: "${{ secrets.AWS_ACCESS_KEY_ID }}",
-                      secretAccessKey: "${{ secrets.AWS_SECRET_ACCESS_KEY }}",
-                      region: S3_REGION,
-                      signatureVersion: 'v4'
-                  });
-                  console.log("S3 client initialized successfully");
-                  return s3Client;
-              } catch (error) {
-                  console.error('Error initializing S3:', error);
-                  displayError('Error initializing S3: ' + error.message);
-                  return null;
-              }
-          }
-          EOL
+          # Create a script with environment variables in your HTML files
+          for file in *.html; do
+            if [ -f "$file" ]; then
+              # Create temp file
+              temp_file=$(mktemp)
+              # Add environment variables before the closing </head> tag
+              awk '
+                /<\/head>/ {
+                  print "<script id=\"env-variables\" type=\"application/json\">"
+                  print "{"
+                  print "  \"FIREBASE_API_KEY\": \"${{ secrets.FIREBASE_API_KEY }}\","
+                  print "  \"FIREBASE_AUTH_DOMAIN\": \"${{ secrets.FIREBASE_AUTH_DOMAIN }}\","
+                  print "  \"FIREBASE_PROJECT_ID\": \"${{ secrets.FIREBASE_PROJECT_ID }}\","
+                  print "  \"FIREBASE_STORAGE_BUCKET\": \"${{ secrets.FIREBASE_STORAGE_BUCKET }}\","
+                  print "  \"FIREBASE_MESSAGING_SENDER_ID\": \"${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}\","
+                  print "  \"FIREBASE_APP_ID\": \"${{ secrets.FIREBASE_APP_ID }}\","
+                  print "  \"AWS_S3_BUCKET\": \"${{ secrets.AWS_S3_BUCKET || '\''maclellanfamily.com'\''}}\","
+                  print "  \"AWS_S3_REGION\": \"${{ secrets.AWS_S3_REGION || '\''us-east-2'\''}}\","
+                  print "  \"AWS_BASE_FOLDER\": \"${{ secrets.AWS_BASE_FOLDER || '\''0 US'\''}}\","
+                  print "  \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\","
+                  print "  \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\","
+                  print "  \"URL_EXPIRATION\": \"${{ secrets.URL_EXPIRATION || '\''3600'\''}}\""
+                  print "}"
+                  print "</script>"
+                }
+                { print }
+              ' "$file" > "$temp_file"
+              mv "$temp_file" "$file"
+            fi
+          done
 
       - name: Build with Jekyll
-        # Outputs to the './_site' directory by default
         run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
         env:
           JEKYLL_ENV: production
 
       - name: Upload artifact
-        # Automatically uploads an artifact from the './_site' directory by default
         uses: actions/upload-pages-artifact@v3
 
   # Deployment job
