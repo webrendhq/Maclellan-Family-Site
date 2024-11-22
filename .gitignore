@@ -72,3 +72,5 @@ serverside
 js/show-pictures.js
 
 .env.local
+
+assets/js/environment.js
