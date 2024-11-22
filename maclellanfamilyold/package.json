@@ -3,6 +3,7 @@
     "@aws-sdk/client-s3": "^3.689.0",
     "@ffmpeg/core": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.10",
+    "dotenv": "^16.4.5",
     "dropbox": "^10.34.0",
     "simple-git": "^3.27.0"
   }

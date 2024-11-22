@@ -1,11 +1,12 @@
-// Firebase configuration
+
+
 const firebaseConfig = {
-    apiKey: "AIzaSyCqGV5J3if7mJoH464xGx6bZ5wgU_wMn3I",
-    authDomain: "maclellen.firebaseapp.com",
-    projectId: "maclellen",
-    storageBucket: "maclellen.appspot.com",
-    messagingSenderId: "254246388059",
-    appId: "1:254246388059:web:ca15c2405a33477665da7e"
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID
 };
 
 // Initialize Firebase
@@ -20,35 +21,26 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 // AWS S3 Configuration
-const S3_BUCKET = 'maclellanfamily.com';
-const S3_REGION = 'us-east-2';
-const BASE_FOLDER = '0 US'; // Root folder within the bucket
-const URL_EXPIRATION = 3600; // URL expiration in seconds (1 hour)
+const S3_BUCKET = process.env.AWS_S3_BUCKET || 'maclellanfamily.com';
+const S3_REGION = process.env.AWS_S3_REGION || 'us-east-2';
+const BASE_FOLDER = process.env.AWS_BASE_FOLDER || '0 US';
+const URL_EXPIRATION = parseInt(process.env.URL_EXPIRATION) || 3600;
 
 // Function to fetch S3 credentials from a secure S3 object
 async function fetchS3Credentials() {
-    const credentialsUrl = "https://maclellanfamily.com.s3.amazonaws.com/BACKEND/keys/keys.json";
-
     try {
-        const response = await fetch(credentialsUrl);
-        if (!response.ok) {
-            throw new Error('Unable to retrieve S3 credentials');
-        }
-
-        const credentials = await response.json();
-        console.log("Fetched S3 credentials successfully");
-
-        // Initialize S3 client using fetched credentials
+        // Initialize S3 client using environment variables
         const s3Client = new AWS.S3({
-            accessKeyId: credentials.accessKeyId,
-            secretAccessKey: credentials.secretAccessKey,
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
             region: S3_REGION,
-            signatureVersion: 'v4' // Important for generating signed URLs
+            signatureVersion: 'v4'
         });
 
+        console.log("S3 client initialized successfully");
         return s3Client;
     } catch (error) {
-        console.error('Error fetching S3 credentials:', error);
+        console.error('Error initializing S3:', error);
         displayError('Error initializing S3: ' + error.message);
         return null;
     }

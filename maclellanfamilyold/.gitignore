@@ -70,3 +70,5 @@ node_modules/
 
 serverside
 js/show-pictures.js
+
+.env.local
