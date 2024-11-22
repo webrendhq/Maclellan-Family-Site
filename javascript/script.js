@@ -1,11 +1,13 @@
-import { 
-    firebaseConfig, 
-    S3_BUCKET, 
-    S3_REGION, 
-    BASE_FOLDER, 
-    URL_EXPIRATION,
-    fetchS3Credentials 
-} from './config.js';
+
+
+const firebaseConfig = {
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID
+};
 
 // Initialize Firebase
 if (!firebase.apps.length) {
@@ -18,13 +20,11 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Rest of your code...
-
 // AWS S3 Configuration
-const S3_BUCKET = process.env.AWS_S3_BUCKET || 'maclellanfamily.com';
-const S3_REGION = process.env.AWS_S3_REGION || 'us-east-2';
-const BASE_FOLDER = process.env.AWS_BASE_FOLDER || '0 US';
-const URL_EXPIRATION = parseInt(process.env.URL_EXPIRATION) || 3600;
+const S3_BUCKET = 'maclellanfamily.com';
+const S3_REGION = 'us-east-2';
+const BASE_FOLDER = '0 US';
+const URL_EXPIRATION = 3600;
 
 // Function to fetch S3 credentials from a secure S3 object
 async function fetchS3Credentials() {
