@@ -1,5 +1,11 @@
 name: Jekyll Build with Secrets
 
+# Add permissions at the top level
+permissions:
+  contents: write  # Gives write permission to GitHub Actions
+  pages: write    # Gives permission to deploy to GitHub Pages
+  id-token: write # Required for GitHub Pages deployment
+
 on:
   push:
     branches: [ main ]
@@ -85,3 +91,7 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./_site
+        # Add these options for more reliable deployment
+        force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
