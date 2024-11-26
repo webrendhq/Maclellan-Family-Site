@@ -1,21 +1,46 @@
-import { signOut } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
-import { auth } from 'https://maclellan-family-website.s3.us-east-2.amazonaws.com/firebase-init.js';
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCqGV5J3if7mJoH464xGx6bZ5wgU_wMn3I",
+  authDomain: "maclellen.firebaseapp.com",
+  projectId: "maclellen",
+  storageBucket: "maclellen.firebasestorage.app",
+  messagingSenderId: "254246388059",
+  appId: "1:254246388059:web:ca15c2405a33477665da7e"
+};
 
-// Handle sign-out
-function handleSignOut() {
-    signOut(auth).then(() => {
-      // Refreshes the current page
-      console.log('User signed out');
-      window.location.href = '/';
-    }).catch((error) => {
-      console.log(error.message);
-    });
+// Initialize Firebase
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+} else {
+  firebase.app();
 }
 
-// Add event listeners for sign-out buttons
-document.addEventListener('DOMContentLoaded', () => {
-    const signOutButtons = document.querySelectorAll('#signout, #signout-settings');
-    signOutButtons.forEach(button => {
-        button.addEventListener('click', handleSignOut);
-    });
-});
+const auth = firebase.auth();
+
+// Make signOut function global
+window.signOut = function() {
+  auth.signOut()
+      .then(() => {
+          sessionStorage.clear();
+          window.location.href = 'index.html';
+      })
+      .catch(error => {
+          console.error('Sign out error:', error);
+          alert('Error signing out: ' + error.message);
+      });
+}
+
+// Auth state observer for protected pages
+function checkAuth() {
+  auth.onAuthStateChanged(user => {
+      const protectedPages = ['main.html', 'events.html', 'images.html'];
+      const currentPage = window.location.pathname.split('/').pop();
+      
+      if (!user && protectedPages.includes(currentPage)) {
+          window.location.href = 'index.html';
+      }
+  });
+}
+
+// Initialize auth check on page load
+document.addEventListener('DOMContentLoaded', checkAuth);
