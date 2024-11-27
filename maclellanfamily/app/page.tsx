@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { login } from "../firebase/auth"; // Adjust the path to your `auth.ts` file
+import { useRouter } from "next/navigation";
+import { login } from "./api/firebase/auth"; // Adjust the path to your `auth.ts` file
 
 const LoginPage: React.FC = () => {
+  const router = useRouter();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -15,13 +17,17 @@ const LoginPage: React.FC = () => {
       return;
     }
 
+    setIsLoading(true);
     try {
       const user = await login(email, password); // Call Firebase login
       setErrorMessage("");
-      setSuccessMessage(`Welcome back, ${user?.email}`);
+      
+      // Redirect to yearbooks page after successful login
+      router.push('/yearbooks');
     } catch (error: any) {
-      setSuccessMessage("");
       setErrorMessage(error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -49,12 +55,12 @@ const LoginPage: React.FC = () => {
         </div>
         <button
           onClick={handleLogin}
-          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition"
+          disabled={isLoading}
+          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Login
+          {isLoading ? "Logging in..." : "Login"}
         </button>
         {errorMessage && <div className="text-red-500 mt-4">{errorMessage}</div>}
-        {successMessage && <div className="text-green-500 mt-4">{successMessage}</div>}
       </div>
     </div>
   );
