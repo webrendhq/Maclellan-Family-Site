@@ -130,7 +130,9 @@ const Modal: React.FC<ModalProps> = ({
 export default function Page() {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [user, setUser] = useState<User | null>(null);
+
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const [startPos, setStartPos] = useState<Position>({ x: 0, y: 0 });
