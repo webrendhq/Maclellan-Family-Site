@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
@@ -98,12 +99,16 @@ export async function GET(request: Request) {
         if (randomImageKey) {
           console.log(`Selected image key for ${folderName}:`, randomImageKey);
           
-          const encodedKey = randomImageKey.split('/').map(part => 
-            encodeURIComponent(part)
-          ).join('/');
+          // Generate presigned URL for the background image
+          const getObjectCommand = new GetObjectCommand({
+            Bucket: process.env.AWS_S3_BUCKET,
+            Key: randomImageKey,
+          });
           
-          backgroundUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_S3_REGION}.amazonaws.com/${encodedKey}`;
-          console.log(`Generated URL for ${folderName}:`, backgroundUrl);
+          backgroundUrl = await getSignedUrl(s3Client, getObjectCommand, { 
+            expiresIn: 3600 // URL expires in 1 hour
+          });
+          console.log(`Generated presigned URL for ${folderName}:`, backgroundUrl);
         }
       }
 
