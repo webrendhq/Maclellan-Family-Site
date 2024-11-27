@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../../api/firebase/firebase';
 import { ChevronLeft, ChevronRight, Heart, Star, Smile, Coffee, Camera, Music, X, LucideIcon } from 'lucide-react';
+import Image from 'next/image';
+
 
 interface ImageData {
   key: string;
@@ -87,11 +89,16 @@ const ImageModal: React.FC<ModalProps> = ({ image, onClose }) => {
           >
             <X size={24} />
           </button>
-          <img
-            src={image.url}
-            alt="Full size view"
-            className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
-          />
+          <div className="relative w-full h-full">
+            <Image
+                src={image.url}
+                alt="Full size view"
+                fill
+                className="object-contain rounded-lg shadow-2xl"
+                sizes="(max-width: 768px) 100vw, 1200px"
+                priority
+            />
+            </div>
         </div>
       </div>
     );
@@ -234,11 +241,15 @@ const ImageModal: React.FC<ModalProps> = ({ image, onClose }) => {
                     }}
                     onClick={() => onImageClick(image, index)}
                   >
-                    <img
-                      src={image.url}
-                      alt={`Memory ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    <div className="relative w-full h-full">
+                        <Image
+                            src={image.url}
+                            alt={`Memory ${index + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 33vw, 25vw"
+                        />
+                    </div>
                     {Math.random() > 0.5 && (
                       <div 
                         className="absolute"

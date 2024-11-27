@@ -20,9 +20,9 @@ const nextConfig = {
   },
 
   // Enable the experimental `appDir` feature for `/app` routing
-  experimental: {
-    appDir: true,
-  },
+  // experimental: {
+  //   appDir: true,
+  // },
 
   // Base path configuration (used when deploying to GitHub Pages)
   basePath: process.env.NODE_ENV === 'production' ? '/MaclellanFamily.com' : '',

@@ -134,6 +134,8 @@ export default function Page() {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
   const [startPos, setStartPos] = useState<Position>({ x: 0, y: 0 });
+
+
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +160,7 @@ export default function Page() {
         setLoading(false);
         return;
       }
-
+  
       try {
         const token = await user.getIdToken();
         const response = await fetch('/api/s3', {
@@ -166,36 +168,26 @@ export default function Page() {
             Authorization: `Bearer ${token}`,
           },
         });
-
+  
         if (!response.ok) {
           throw new Error('Failed to fetch folders');
         }
-
+  
         const data = await response.json();
         setFolders(data);
-      } catch (error) {
-        console.error('Error fetching folders:', error);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error('Error fetching folders:', error.message);
+        } else {
+          console.error('Unknown error fetching folders:', error);
+        }
       } finally {
         setLoading(false);
       }
     };
-
+  
     fetchFolders();
   }, [user]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(false);
-    setStartPos({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
-    
-    setTimeout(() => {
-      if (e.buttons === 1) {
-        setIsDragging(true);
-      }
-    }, 100);
-  };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !gridRef.current || !containerRef.current) return;
@@ -238,6 +230,21 @@ export default function Page() {
       `;
     });
   };
+  
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(false);
+    setStartPos({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+    
+    setTimeout(() => {
+      if (e.buttons === 1) {
+        setIsDragging(true);
+      }
+    }, 100);
+  };
+  
 
   const handleMouseUp = () => {
     setIsDragging(false);
