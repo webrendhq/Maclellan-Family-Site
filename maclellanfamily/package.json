@@ -13,6 +13,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.701.0",
     "@aws-sdk/s3-request-presigner": "^3.701.0",
+    "@next/font": "^14.2.15",
     "@types/three": "^0.170.0",
     "aws-sdk": "^2.1692.0",
     "firebase": "^11.0.2",

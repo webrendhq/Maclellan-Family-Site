@@ -18,9 +18,9 @@ const LoginPage: React.FC = () => {
 
     setIsLoading(true);
     try {
+      
       setErrorMessage("");
-
-      // Simulate authentication here
+      
       // Redirect to yearbooks page after successful login
       router.push('/yearbooks');
     } catch (error: any) {
@@ -31,24 +31,16 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-cover bg-fixed" style={{ backgroundImage: 'url(/scrapbook-bg.jpg)' }}>
-      <h1 className="text-4xl font-bold mb-8 text-center text-pink-600">Login</h1>
-      
-      {/* Polaroid Container */}
-      <div className="relative bg-white shadow-2xl rounded-lg p-6 w-full max-w-sm 
-                      before:content-[''] before:absolute before:-top-4 before:left-8 before:w-16 before:h-4 before:bg-yellow-400 before:rotate-12
-                      after:content-[''] after:absolute after:-bottom-4 after:right-8 after:w-16 after:h-4 after:bg-yellow-400 after:-rotate-12">
-        {/* Tape Strips */}
-        <div className="absolute top-0 left-0 w-24 h-4 bg-yellow-500 transform -rotate-12"></div>
-        <div className="absolute bottom-0 right-0 w-24 h-4 bg-yellow-500 transform rotate-12"></div>
-        
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <h1 className="text-2xl font-bold mb-4">Login</h1>
+      <div className="bg-white shadow-md rounded px-8 py-6 w-full max-w-sm">
         <div className="mb-4">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-pink-400"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div className="mb-4">
@@ -57,13 +49,13 @@ const LoginPage: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-pink-400"
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <button
           onClick={handleLogin}
           disabled={isLoading}
-          className="w-full bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? "Logging in..." : "Login"}
         </button>
@@ -73,4 +65,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export default LoginPage; 
