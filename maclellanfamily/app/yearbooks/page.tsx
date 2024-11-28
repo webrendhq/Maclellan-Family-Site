@@ -26,7 +26,7 @@ interface ModalProps {
   hasNext: boolean;
   onBrowse: (folderName: string) => void;
 }
-
+ 
 const BookCover: React.FC<{ folder: FolderData }> = ({ folder }) => (
   <div className="book-container w-48 h-64 perspective-1000">
     <div className="book relative w-full h-full transform-style-3d transition-transform duration-500 ease-in-out hover:rotate-y-10">
