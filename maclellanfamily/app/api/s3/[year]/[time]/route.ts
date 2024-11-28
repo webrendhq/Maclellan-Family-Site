@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest,NextResponse } from 'next/server';
 import { ListObjectsV2Command, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getAuth } from 'firebase-admin/auth';
@@ -31,10 +31,12 @@ const s3Client = new S3Client({
 } as const);
 
 export async function GET(
-  request: Request,
-  { params }: { params: { year: string; time: string } }
+  request: NextRequest,
+  context: { params: { year: string; time: string } }
 ) {
   try {
+    const { params } = context;
+
     // Check authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

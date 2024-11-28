@@ -157,6 +157,9 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (user) {
+      console.log("User is logged in:", user);
+    }
     const fetchFolders = async () => {
       if (!user) {
         setLoading(false);

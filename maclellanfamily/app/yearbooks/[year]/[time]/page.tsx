@@ -153,23 +153,23 @@ const ImageModal: React.FC<ModalProps> = ({ image, onClose }) => {
           ];
         }
         return Array(4).fill(layoutTypes[3]); // Four equal quarters
-      case 5:
-        if (isMobile) {
-          return [
-            mobileLayoutTypes[1], // Top
-            mobileLayoutTypes[3], // Middle left
-            mobileLayoutTypes[3], // Middle right
-            mobileLayoutTypes[3], // Bottom left
-            mobileLayoutTypes[3], // Bottom right
-          ];
-        }
-        return [
-          layoutTypes[1], // Top full width
-          layoutTypes[3], // Bottom left
-          layoutTypes[2], // Bottom middle
-          layoutTypes[3], // Bottom right top
-          layoutTypes[3], // Bottom right bottom
-        ];
+      // case 5:
+      //   if (isMobile) {
+      //     return [
+      //       mobileLayoutTypes[1], // Top
+      //       mobileLayoutTypes[3], // Middle left
+      //       mobileLayoutTypes[3], // Middle right
+      //       mobileLayoutTypes[3], // Bottom left
+      //       mobileLayoutTypes[3], // Bottom right
+      //     ];
+      //   }
+      //   return [
+      //     layoutTypes[1], // Top full width
+      //     layoutTypes[3], // Bottom left
+      //     layoutTypes[2], // Bottom middle
+      //     layoutTypes[3], // Bottom right top
+      //     layoutTypes[3], // Bottom right bottom
+      //   ];
       default:
         return Array(imageCount).fill(isMobile ? mobileLayoutTypes[3] : layoutTypes[3]);
     }
