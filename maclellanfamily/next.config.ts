@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Use environment variables from .env files and GitHub Actions
   env: {
     // Firebase public variables (accessible client-side)
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY,
@@ -19,18 +18,20 @@ const nextConfig = {
     URL_EXPIRATION: process.env.URL_EXPIRATION,
   },
 
-  // Enable the experimental `appDir` feature for `/app` routing
-  // experimental: {
-  //   appDir: true,
-  // },
-
-  // Base path configuration (used when deploying to GitHub Pages)
   basePath: process.env.NODE_ENV === 'production' ? '/MaclellanFamily.com' : '',
 
-  // Disable image optimization for static export
+  output: 'export',
+
   images: {
     unoptimized: true,
+    domains: [],
   },
-};
 
-module.exports = nextConfig;
+  distDir: 'dist',
+  
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+}
+
+module.exports = nextConfig

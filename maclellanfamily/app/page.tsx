@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login } from "./api/firebase/auth"; // Adjust the path to your `auth.ts` file
 
 const LoginPage: React.FC = () => {
   const router = useRouter();

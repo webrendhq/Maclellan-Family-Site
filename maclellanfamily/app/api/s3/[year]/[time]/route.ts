@@ -1,4 +1,4 @@
-import { NextRequest,NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ListObjectsV2Command, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getAuth } from 'firebase-admin/auth';
@@ -30,13 +30,18 @@ const s3Client = new S3Client({
   },
 } as const);
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { year: string; time: string } }
-) {
-  try {
-    
+type RouteParams = {
+  params: {
+    year: string;
+    time: string;
+  };
+};
 
+// Explicitly type the route handler according to Next.js expectations
+export async function GET(request: NextRequest, props: RouteParams) {
+  try {
+    const { year, time } = props.params;
+    
     // Check authorization header
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -56,10 +61,10 @@ export async function GET(
     const folderPath = userDoc.data()?.folderPath || '';
 
     // Define S3 prefix for the time period
-    const timePrefix = `${process.env.AWS_BASE_FOLDER}${folderPath}/${params.year}/${params.time}/`;
+    const timePrefix = `${process.env.AWS_BASE_FOLDER}${folderPath}/${year}/${time}/`;
     console.log('Time-specific S3 prefix:', timePrefix);
 
-    // Fetch objects from S3
+    // Rest of your code remains the same...
     const command = new ListObjectsV2Command({
       Bucket: process.env.AWS_S3_BUCKET,
       Prefix: timePrefix,
@@ -67,7 +72,6 @@ export async function GET(
 
     const response = await s3Client.send(command);
 
-    // Filter for image files and generate signed URLs
     const images = await Promise.all(
       (response.Contents || [])
         .filter(item => item.Key?.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/i))
@@ -77,9 +81,8 @@ export async function GET(
             Key: item.Key,
           });
 
-          // Generate signed URL
           const signedUrl = await getSignedUrl(s3Client, getObjectCommand, {
-            expiresIn: 3600, // 1 hour
+            expiresIn: 3600,
           });
 
           return {
@@ -90,12 +93,9 @@ export async function GET(
         })
     );
 
-    // Sort images by last modified date (newest first)
     const sortedImages = images.sort((a, b) =>
       (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0)
     );
-
-    console.log(`Found ${sortedImages.length} images in folder ${timePrefix}`);
 
     return NextResponse.json({
       images: sortedImages,
