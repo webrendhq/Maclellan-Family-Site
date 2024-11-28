@@ -19,7 +19,7 @@ const LoginPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const user = await login(email, password); // Call Firebase login
+      
       setErrorMessage("");
       
       // Redirect to yearbooks page after successful login

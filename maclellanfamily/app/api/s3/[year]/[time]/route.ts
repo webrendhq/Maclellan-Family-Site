@@ -32,10 +32,10 @@ const s3Client = new S3Client({
 
 export async function GET(
   request: NextRequest,
-  context: { params: { year: string; time: string } }
+  { params }: { params: { year: string; time: string } }
 ) {
   try {
-    const { params } = context;
+    
 
     // Check authorization header
     const authHeader = request.headers.get('authorization');
