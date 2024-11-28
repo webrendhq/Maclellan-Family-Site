@@ -1,15 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: process.env.NODE_ENV === 'production' ? '/MaclellanFamily.com' : '',
-  output: 'standalone',
+  reactStrictMode: true,
+  swcMinify: true,
   images: {
-    unoptimized: true,
     domains: [],
   },
-  distDir: 'dist',
-  typescript: {
-    ignoreBuildErrors: true,
-  }
+  distDir: '.next',
 }
 
 module.exports = nextConfig
