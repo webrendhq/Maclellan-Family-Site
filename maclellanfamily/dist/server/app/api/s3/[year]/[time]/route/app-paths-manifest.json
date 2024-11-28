@@ -1,0 +1,3 @@
+{
+  "/api/s3/[year]/[time]/route": "app/api/s3/[year]/[time]/route.js"
+}

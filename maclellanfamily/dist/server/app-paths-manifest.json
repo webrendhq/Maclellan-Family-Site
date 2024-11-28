@@ -1,1 +1,10 @@
-{}
+{
+  "/page": "app/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/yearbooks/page": "app/yearbooks/page.js",
+  "/api/s3/route": "app/api/s3/route.js",
+  "/yearbooks/[year]/page": "app/yearbooks/[year]/page.js",
+  "/api/s3/[year]/route": "app/api/s3/[year]/route.js",
+  "/yearbooks/[year]/[time]/page": "app/yearbooks/[year]/[time]/page.js",
+  "/api/s3/[year]/[time]/route": "app/api/s3/[year]/[time]/route.js"
+}
