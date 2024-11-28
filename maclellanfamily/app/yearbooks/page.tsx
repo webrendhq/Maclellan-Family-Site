@@ -60,7 +60,7 @@ const BookCover: React.FC<{ folder: FolderData }> = ({ folder }) => (
     </div>
   </div>
 );
-
+ 
 const Modal: React.FC<ModalProps> = ({
   folder,
   onClose,
