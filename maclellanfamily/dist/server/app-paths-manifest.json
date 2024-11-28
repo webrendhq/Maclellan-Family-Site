@@ -1,11 +1,6 @@
 {
-  "/api/s3/[year]/[time]/route": "app/api/s3/[year]/[time]/route.js",
-  "/api/s3/[year]/route": "app/api/s3/[year]/route.js",
-  "/api/s3/route": "app/api/s3/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
-  "/yearbooks/[year]/page": "app/yearbooks/[year]/page.js",
-  "/yearbooks/[year]/[time]/page": "app/yearbooks/[year]/[time]/page.js",
-  "/yearbooks/page": "app/yearbooks/page.js"
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/yearbooks/page": "app/yearbooks/page.js",
+  "/api/s3/route": "app/api/s3/route.js"
 }
