@@ -1,14 +1,16 @@
-// next.config.ts
-const nextConfig = {
-  output: 'standalone',
-  images: {
-    unoptimized: true,
-    domains: [],
-  },
-  distDir: 'dist',
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-};
+import { NextConfig } from 'next'
 
-module.exports = nextConfig;
+const config: NextConfig = {
+//  basePath: process.env.NODE_ENV === 'production' ? '/MaclellanFamily.com' : '',
+ output: 'standalone',
+ images: {
+   unoptimized: true,
+   domains: [],
+ },
+ 
+ typescript: {
+   ignoreBuildErrors: true,
+ }
+}
+
+export default config

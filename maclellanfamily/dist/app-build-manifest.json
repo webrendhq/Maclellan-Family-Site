@@ -1,3 +1,80 @@
 {
-  "pages": {}
+  "pages": {
+    "/_not-found/page": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/app/_not-found/page-042edb63c275bb77.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/css/e89fe958eb3dbafb.css",
+      "static/chunks/app/layout-345b27a63787f980.js"
+    ],
+    "/api/s3/[year]/[time]/route": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/app/api/s3/[year]/[time]/route-d02f08a2da99be7e.js"
+    ],
+    "/api/s3/[year]/route": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/app/api/s3/[year]/route-8b164c30dd1f0527.js"
+    ],
+    "/api/s3/route": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/app/api/s3/route-f6f82c2042a6ebd7.js"
+    ],
+    "/yearbooks/[year]/[time]/page": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/bc9e92e6-4a22cdf3f0f8a301.js",
+      "static/chunks/938157b5-de5570d9aa307e1e.js",
+      "static/chunks/266-16bfc50598925e57.js",
+      "static/chunks/815-aebab10315aaf3b1.js",
+      "static/chunks/457-33822ce802600b8d.js",
+      "static/chunks/app/yearbooks/[year]/[time]/page-6afd391d9dce9c95.js"
+    ],
+    "/page": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/app/page-cc9114e5f0ac70c0.js"
+    ],
+    "/yearbooks/[year]/page": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/bc9e92e6-4a22cdf3f0f8a301.js",
+      "static/chunks/938157b5-de5570d9aa307e1e.js",
+      "static/chunks/266-16bfc50598925e57.js",
+      "static/chunks/app/yearbooks/[year]/page-904279f17457354e.js"
+    ],
+    "/yearbooks/page": [
+      "static/chunks/webpack-1c1b9e9a97f808a4.js",
+      "static/chunks/4bd1b696-c17e1f4d41466d98.js",
+      "static/chunks/517-748a286e16e4429a.js",
+      "static/chunks/main-app-27f4b547d0a83d4b.js",
+      "static/chunks/bc9e92e6-4a22cdf3f0f8a301.js",
+      "static/chunks/938157b5-de5570d9aa307e1e.js",
+      "static/chunks/266-16bfc50598925e57.js",
+      "static/chunks/815-aebab10315aaf3b1.js",
+      "static/chunks/app/yearbooks/page-2cb2cd382296d55b.js"
+    ]
+  }
 }
