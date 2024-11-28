@@ -1,5 +1,4 @@
 {
-    "buildCommand": "cd maclellanfamily && npm install && npm run build",
-    "outputDirectory": "maclellanfamily/.next"
-  }
-  
+    "buildCommand": "npm install && npm run build",
+    "outputDirectory": ".next"
+}
