@@ -1,6 +1,5 @@
-/** @type {import('next').NextConfig} */
+// next.config.ts
 const nextConfig = {
-  basePath: process.env.NODE_ENV === 'production' ? '/MaclellanFamily.com' : '',
   output: 'standalone',
   images: {
     unoptimized: true,

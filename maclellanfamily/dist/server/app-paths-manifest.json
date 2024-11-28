@@ -1,6 +1,1 @@
-{
-  "/page": "app/page.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/yearbooks/page": "app/yearbooks/page.js",
-  "/api/s3/route": "app/api/s3/route.js"
-}
+{}
