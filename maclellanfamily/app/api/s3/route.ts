@@ -1,150 +1,287 @@
-import { NextResponse } from 'next/server';
-import { ListObjectsV2Command, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { NextRequest, NextResponse } from "next/server";
+import { adminAuth, adminDb } from '@/api/firebase/admin';
+import { DocumentData, DocumentSnapshot } from 'firebase-admin/firestore';
 
-// Initialize Firebase Admin if not already initialized
-if (!getApps().length) {
+const s3 = new S3Client({
+  region: process.env.AWS_S3_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+
+const VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+async function verifyAuth(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  console.log('Auth header present:', !!authHeader);
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new Error('Invalid authorization header');
+  }
+
+  const token = authHeader.split('Bearer ')[1];
   try {
-    initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY,
-      }),
-    });
-    console.log('Firebase Admin initialized successfully');
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    console.log('Token verified for user:', decodedToken.uid);
+    return decodedToken;
   } catch (error) {
-    console.error('Firebase Admin initialization error:', error);
-    throw error;
+    console.error('Token verification failed:', error);
+    throw new Error('Invalid authentication token');
   }
 }
 
-const s3Client = new S3Client({
-  region: process.env.AWS_S3_REGION || 'us-east-2',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-  }
-} as const);
-
-export async function GET(request: Request) {
-  console.log('API route handler started');
+async function getUserFolderPath(userId: string): Promise<string> {
+  console.log('Attempting to fetch user document for ID:', userId);
   
+  let userDoc: DocumentSnapshot<DocumentData>;
   try {
-    console.log('Environment check:', {
-      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
-      hasClientEmail: !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      hasPrivateKey: !!process.env.FIREBASE_ADMIN_PRIVATE_KEY,
-      hasAwsRegion: !!process.env.AWS_S3_REGION,
-      hasAwsAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-      hasAwsSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
-      hasAwsBucket: !!process.env.AWS_S3_BUCKET
+    userDoc = await adminDb.collection('users').doc(userId).get();
+    console.log('Firestore response:', {
+      exists: userDoc.exists,
+      path: userDoc.ref.path,
+      documentId: userDoc.id
     });
+  } catch (error) {
+    console.error('Firestore error:', error);
+    throw new Error('Failed to fetch user data');
+  }
 
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      console.log('No valid authorization header found');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  if (!userDoc.exists) {
+    throw new Error('User document not found');
+  }
 
-    const token = authHeader.split('Bearer ')[1];
-    console.log('Got token, attempting verification');
+  const userData = userDoc.data();
+  const folderPath = userData?.folderPath;
+  console.log('Found folderPath:', folderPath);
 
-    const decodedToken = await getAuth().verifyIdToken(token);
-    const userId = decodedToken.uid;
-    console.log('Token verified for user:', userId);
+  if (!folderPath) {
+    throw new Error('Folder path not found for user');
+  }
 
-    const db = getFirestore();
-    const userDoc = await db.collection('users').doc(userId).get();
-    const folderPath = userDoc.data()?.folderPath || '';
-    console.log('Retrieved folder path:', folderPath);
+  return folderPath;
+}
 
-    const s3Prefix = `${process.env.AWS_BASE_FOLDER}${folderPath}/`;
-    console.log('S3 prefix:', s3Prefix);
+async function getPresignedUrl(bucket: string, key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+  });
+  
+  return await getSignedUrl(s3, command, { expiresIn: 3600 });
+}
 
+async function getRandomImageFromFolder(bucket: string, folderPrefix: string): Promise<string | null> {
+  try {
     const command = new ListObjectsV2Command({
-      Bucket: process.env.AWS_S3_BUCKET,
-      Prefix: s3Prefix,
-      Delimiter: '/',
+      Bucket: bucket,
+      Prefix: folderPrefix,
     });
 
-    const response = await s3Client.send(command);
-    console.log('S3 response received:', {
-      prefixCount: response.CommonPrefixes?.length || 0,
-      contentCount: response.Contents?.length || 0
-    });
+    const response = await s3.send(command);
+    
+    const imageFiles = (response.Contents?.filter(file => {
+      const extension = file.Key?.toLowerCase().split('.').pop();
+      return extension && VALID_IMAGE_EXTENSIONS.includes(extension);
+    }) ?? []);
 
-    const folderPromises = (response.CommonPrefixes || []).map(async (prefix) => {
-      if (!prefix.Prefix) return null;
-      
-      const folderName = prefix.Prefix.split('/').slice(-2)[0];
-      console.log(`\nProcessing folder: ${folderName}`);
-      
-      const yearContents = await s3Client.send(new ListObjectsV2Command({
-        Bucket: process.env.AWS_S3_BUCKET,
-        Prefix: prefix.Prefix,
-        Delimiter: ''
-      }));
+    if (imageFiles.length === 0) return null;
 
-      const images = yearContents.Contents?.filter(item => 
-        item.Key?.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/i)
-      ).map(item => item.Key) || [];
+    const randomIndex = Math.floor(Math.random() * imageFiles.length);
+    const randomImage = imageFiles[randomIndex];
 
-      let backgroundUrl = null;
-      if (images.length > 0) {
-        const randomImageKey = images[Math.floor(Math.random() * images.length)];
-        if (randomImageKey) {
-          console.log(`Selected image key for ${folderName}:`, randomImageKey);
-          
-          // Generate presigned URL for the background image
-          const getObjectCommand = new GetObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
-            Key: randomImageKey,
-          });
-          
-          backgroundUrl = await getSignedUrl(s3Client, getObjectCommand, { 
-            expiresIn: 3600 // URL expires in 1 hour
-          });
-          console.log(`Generated presigned URL for ${folderName}:`, backgroundUrl);
-        }
+    if (!randomImage.Key) return null;
+
+    return await getPresignedUrl(bucket, randomImage.Key);
+  } catch (error) {
+    console.error('Error getting random image:', error);
+    return null;
+  }
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    const decodedToken = await verifyAuth(request);
+    const userId = decodedToken.uid;
+
+    const folderPath = await getUserFolderPath(userId);
+    const cleanPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath;
+    const s3Prefix = `0 US/${cleanPath}/`;
+
+    const { searchParams } = new URL(request.url);
+    const specificFolder = searchParams.get('folder');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    
+    if (specificFolder) {
+      if (!/^[\w-]+$/.test(specificFolder)) {
+        return NextResponse.json(
+          { error: 'Invalid folder name' },
+          { status: 400 }
+        );
       }
 
-      return {
-        name: folderName,
-        backgroundUrl,
-        totalImages: images.length
-      };
+      const folderPrefix = `${s3Prefix}${specificFolder}/`;
+      console.log('Fetching images from folder:', folderPrefix);
+      
+      try {
+        const command = new ListObjectsV2Command({
+          Bucket: process.env.AWS_S3_BUCKET!,
+          Prefix: folderPrefix,
+        });
+
+        const response = await s3.send(command);
+        
+        const imageFiles = (response.Contents?.filter(file => {
+          const extension = file.Key?.toLowerCase().split('.').pop();
+          return extension && VALID_IMAGE_EXTENSIONS.includes(extension);
+        }) ?? []).sort((a, b) => {
+          const aName = a.Key?.split('/').pop() || '';
+          const bName = b.Key?.split('/').pop() || '';
+          return aName.localeCompare(bName);
+        });
+
+        if (imageFiles.length === 0) {
+          return NextResponse.json(
+            { error: 'No images found in folder' },
+            { status: 404 }
+          );
+        }
+
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedFiles = imageFiles.slice(startIndex, endIndex);
+
+        const signedUrls = await Promise.all(
+          paginatedFiles.map(async (file) => {
+            if (!file.Key) return null;
+            return {
+              url: await getPresignedUrl(process.env.AWS_S3_BUCKET!, file.Key),
+              key: file.Key.split('/').pop()
+            };
+          })
+        );
+
+        return NextResponse.json({
+          images: signedUrls.filter(Boolean),
+          totalImages: imageFiles.length,
+          currentPage: page,
+          totalPages: Math.ceil(imageFiles.length / limit)
+        });
+      } catch (s3Error) {
+        console.error('S3 error while fetching images:', s3Error);
+        return NextResponse.json(
+          { error: 'Failed to fetch images from S3' },
+          { status: 500 }
+        );
+      }
+    } else {
+      console.log('Using S3 prefix for folder listing:', s3Prefix);
+      
+      try {
+        const command = new ListObjectsV2Command({
+          Bucket: process.env.AWS_S3_BUCKET!,
+          Prefix: s3Prefix,
+          Delimiter: '/',
+        });
+
+        const response = await s3.send(command);
+        
+        const folders = response.CommonPrefixes
+          ?.map(prefix => prefix.Prefix?.slice(s3Prefix.length, -1))
+          .filter((folder): folder is string => folder !== undefined) ?? [];
+
+        const foldersWithThumbnails = await Promise.all(
+          folders.map(async (folder) => {
+            const folderPrefix = `${s3Prefix}${folder}/`;
+            const thumbnailUrl = await getRandomImageFromFolder(process.env.AWS_S3_BUCKET!, folderPrefix);
+            return {
+              name: folder,
+              thumbnailUrl
+            };
+          })
+        );
+        
+        return NextResponse.json({ folders: foldersWithThumbnails });
+      } catch (s3Error) {
+        console.error('S3 query failed:', s3Error);
+        return NextResponse.json(
+          { error: 'Failed to fetch folders from S3' },
+          { status: 500 }
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    
+    const status = error instanceof Error
+      ? error.message.includes('auth') 
+        ? 401 
+        : error.message.includes('not found')
+          ? 404
+          : 500
+      : 500;
+    
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'An unexpected error occurred' },
+      { status }
+    );
+  }
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const decodedToken = await verifyAuth(request);
+    const userId = decodedToken.uid;
+
+    const folderPath = await getUserFolderPath(userId);
+    const cleanPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath;
+    const s3Prefix = `0 US/${cleanPath}/`;
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const folder = formData.get('folder') as string;
+
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    if (!folder) {
+      return NextResponse.json({ error: 'No folder specified' }, { status: 400 });
+    }
+
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    if (!fileExtension || !VALID_IMAGE_EXTENSIONS.includes(fileExtension)) {
+      return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const command = new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET!,
+      Key: `${s3Prefix}${folder}/${file.name}`, // Add folder to the path
+      Body: buffer,
+      ContentType: file.type,
     });
 
-    const folders = (await Promise.all(folderPromises))
-      .filter(folder => folder !== null)
-      .sort((a, b) => parseInt(a!.name) - parseInt(b!.name));
+    await s3.send(command);
 
-    console.log('\nFinal folders data:', 
-      folders.map(f => ({
-        name: f?.name,
-        hasUrl: !!f?.backgroundUrl,
-        urlPreview: f?.backgroundUrl ? `${f.backgroundUrl.substring(0, 50)}...` : 'none'
-      }))
-    );
-    
-    return NextResponse.json(folders);
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Detailed error:', error);
-    if (error instanceof Error) {
-      console.error({
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        cause: error.cause
-      });
-    }
+    console.error('Upload error:', error);
+    
+    const status = error instanceof Error
+      ? error.message.includes('auth') 
+        ? 401 
+        : error.message.includes('not found')
+          ? 404
+          : 500
+      : 500;
+    
     return NextResponse.json(
-      { error: 'Internal Server Error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : 'An unexpected error occurred' },
+      { status }
     );
   }
 }

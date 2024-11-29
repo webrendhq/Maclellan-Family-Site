@@ -1,3 +1,4 @@
+// app/api/s3/[year]/[time]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { ListObjectsV2Command, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -17,30 +18,24 @@ if (!getApps().length) {
     });
   } catch (error) {
     console.error('Firebase Admin initialization error:', error);
-    throw error;
   }
 }
 
 // Initialize S3 Client
 const s3Client = new S3Client({
-  region: process.env.AWS_S3_REGION || 'us-east-2',
+  region: process.env.AWS_S3_REGION!,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
   },
-} as const);
+});
 
-type RouteParams = {
-  params: {
-    year: string;
-    time: string;
-  };
-};
-
-// Explicitly type the route handler according to Next.js expectations
-export async function GET(request: NextRequest, props: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { year: string; time: string } }
+) {
   try {
-    const { year, time } = props.params;
+    const { year, time } = params;
     
     // Check authorization header
     const authHeader = request.headers.get('authorization');
@@ -58,26 +53,38 @@ export async function GET(request: NextRequest, props: RouteParams) {
     if (!userDoc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-    const folderPath = userDoc.data()?.folderPath || '';
+    const folderPath = userDoc.data()?.folderPath;
 
-    // Define S3 prefix for the time period
-    const timePrefix = `${process.env.AWS_BASE_FOLDER}${folderPath}/${year}/${time}/`;
-    console.log('Time-specific S3 prefix:', timePrefix);
+    // Construct the S3 path
+    const cleanPath = folderPath.startsWith('/') ? folderPath.slice(1) : folderPath;
+    const prefix = time === 'other' 
+      ? `0 US/${cleanPath}/${year}/`
+      : `0 US/${cleanPath}/${year}/${time}/`;
 
-    // Rest of your code remains the same...
+    // List objects in the folder
     const command = new ListObjectsV2Command({
-      Bucket: process.env.AWS_S3_BUCKET,
-      Prefix: timePrefix,
+      Bucket: process.env.AWS_S3_BUCKET!,
+      Prefix: prefix,
     });
 
     const response = await s3Client.send(command);
 
+    // Generate signed URLs for each image
     const images = await Promise.all(
       (response.Contents || [])
-        .filter(item => item.Key?.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/i))
+        .filter(item => {
+          if (!item.Key) return false;
+          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.Key);
+          if (time === 'other') {
+            // For 'other', only include files directly in the year folder
+            const itemPath = item.Key.replace(prefix, '');
+            return isImage && !itemPath.includes('/');
+          }
+          return isImage; // For regular time folders, include all images
+        })
         .map(async (item) => {
           const getObjectCommand = new GetObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET,
+            Bucket: process.env.AWS_S3_BUCKET!,
             Key: item.Key,
           });
 
@@ -88,31 +95,22 @@ export async function GET(request: NextRequest, props: RouteParams) {
           return {
             key: item.Key,
             url: signedUrl,
-            lastModified: item.LastModified,
+            lastModified: item.LastModified?.toISOString(),
           };
         })
     );
 
-    const sortedImages = images.sort((a, b) =>
-      (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0)
-    );
-
     return NextResponse.json({
-      images: sortedImages,
-      prefix: timePrefix,
+      images: images.sort((a, b) => 
+        (new Date(b.lastModified || 0).getTime()) - 
+        (new Date(a.lastModified || 0).getTime())
+      ),
     });
+    
   } catch (error) {
-    console.error('Detailed error:', error);
-    if (error instanceof Error) {
-      console.error({
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        cause: error.cause,
-      });
-    }
+    console.error('Error processing request:', error);
     return NextResponse.json(
-      { error: 'Internal Server Error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }

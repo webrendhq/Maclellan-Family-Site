@@ -1,0 +1,8 @@
+{
+    "env": {
+      "AWS_SDK_LOAD_CONFIG": "1"
+    },
+    "buildCommand": "next build",
+    "devCommand": "next dev",
+    "framework": "nextjs"
+  }
